@@ -64,6 +64,8 @@ public sealed record ExerciseConfig
     public required GradeThresholds Grades { get; init; }
     public required CoachingParams Coaching { get; init; }
     public required ExerciseDef[] Exercises { get; init; }
+    /// <summary>Driving exams built from the exercises (M8).</summary>
+    public ExamDef[] Exams { get; init; } = [];
 
     /// <summary>The vehicle file's conventions, plus enums written as camelCase strings.</summary>
     public static readonly JsonSerializerOptions JsonOptions = new(VehicleParams.JsonOptions)
@@ -91,6 +93,8 @@ public sealed record ExerciseConfig
         Require(Exercises.Length > 0, "at least one exercise is required");
         Require(Exercises.Select(e => e.Id).Distinct().Count() == Exercises.Length, "exercise ids must be unique");
         foreach (var e in Exercises) e.Validate();
+        Require(Exams.Select(x => x.Id).Distinct().Count() == Exams.Length, "exam ids must be unique");
+        foreach (var x in Exams) x.Validate(this);
     }
 
     public ExerciseDef Find(string id) =>

@@ -1,0 +1,14 @@
+// Teaching-mode audio cues (M8, docs/design.en.md). A cue is spoken when its condition becomes true,
+// at most once per cooldown. Conditions: clutchBiting (in gear, nearly stopped, engagement above
+// threshold), stallMarginLow (within threshold rpm of stalling while the clutch engages),
+// rollingBack (moving against the gear's direction faster than threshold m/s), overRev, clutchHot.
+{
+  "nearlyStoppedKmh": 2,
+  "cues": [
+    { "id": "bite", "when": "clutchBiting", "threshold": 0.05, "say": "Bite point", "cooldownS": 6 },
+    { "id": "throttle", "when": "stallMarginLow", "threshold": 50, "say": "More throttle", "cooldownS": 4 },
+    { "id": "rollback", "when": "rollingBack", "threshold": 0.1, "say": "Rolling back", "cooldownS": 4 },
+    { "id": "overRev", "when": "overRev", "say": "Too many revs", "cooldownS": 5 },
+    { "id": "clutchHot", "when": "clutchHot", "say": "Clutch is hot", "cooldownS": 30 }
+  ]
+}

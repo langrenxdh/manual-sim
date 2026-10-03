@@ -184,5 +184,13 @@
         { "metric": "timeS", "good": 40, "bad": 80, "weight": 15 }
       ]
     }
+  ],
+  "exams": [
+    {
+      "id": "drivingTest",
+      "name": "Driving test",
+      "parts": ["flatPullAway", "stopAndHillStart", "trafficQueue", "revMatchDownshift", "reverseUphill"],
+      "passAverage": 70
+    }
   ]
 }
