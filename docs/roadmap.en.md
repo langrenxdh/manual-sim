@@ -69,6 +69,8 @@ v1 (M0–M3) is complete, and M4 (graded exercises and scoring) is built. This d
 
 ### M7 — Fidelity and other cars (ideas 12, 13, 14)
 
+**Status: implemented (2026-10-03), see the M7 decision record in the design doc; hand check pending.**
+
 - **Clutch temperature (12):** a thermal state driven by slip power (the slip energy we already measure) with cooling. A hot clutch's friction coefficient falls (fade: less capacity, more slip); above a threshold a warning appears ("clutch smell"). It emerges from physics, no special rule (hard rule 2). Parameters in the vehicle file and panel.
 - **Cold engine and air-con (13):** engine temperature state; cold friction is higher and the ECU idle target is higher, settling to normal idle as the engine warms (the values are estimates to tune by feel against my own car). Air-con as a switchable load torque at idle that the idle controller must cover.
 - **Other cars (14):** more `config/*.json` vehicle files (for example a small naturally aspirated petrol, a diesel with high low-end torque, a heavy car) and a car menu. Without real data, each is tuned by plausibility and published figures.

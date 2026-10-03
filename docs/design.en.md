@@ -95,6 +95,10 @@ m \dot{v} = \frac{T_{clutch} \, i_g \, i_f \, \eta}{r} - F_{aero} - F_{roll} - m
 | Bite point, bite-zone width | — | Tunable, by feel |
 | Turbo time constant, NA torque curve | — | Tunable, by feel |
 | Engine inertia, stall threshold | 0.15 kg·m², 400 rpm | M1 initial values (includes the dual-mass flywheel), tunable by feel |
+| Clutch heat capacity, cooling, fade (M7) | 3000 J/K, 15 W/K; fade from 250 °C, friction down to 60 % at 350 °C; smell above 220 °C | Estimates, tunable |
+| Engine heat capacity, waste heat, cooling, thermostat (M7) | 35000 J/K; waste heat = 1.9 × mechanical power; 20 W/K; 90 °C, 2000 W/K | Estimates, tunable |
+| Cold-engine effects (M7) | At 0 °C internal friction +50 %, idle +300 rpm, fading linearly to none at 90 °C | Estimates, tune by feel against my own car |
+| Air-con (M7) | 8 Nm load, idle +50 rpm | Estimates, tunable |
 
 Every parameter marked "tunable" is exposed in the live tuning panel: tune while driving, then save as the Golf config file.
 
@@ -230,6 +234,12 @@ There is no real-car data, so the "ground truth" is my driving experience with t
 | T3 | Stationary on 10 %, first gear, clutch held down, brake held 1 s then released, no further input | Hold time within 0.1 s of the setting, car does not move during it; brake force released as a ramp; rollback starts 2–2.5 s after releasing the brake | Golf hill-start assist |
 | T4 | Fourth gear at 70 km/h, clutch down, select first, release clutch over 0.5 s | Engine speed dragged into the red zone (≥ redline start); peak 100 ms mean deceleration ≥ 0.3 g | Physics reasoning. Originally "first gear 60 km/h"; see the M1 decision record below |
 | T5 | Push the lever into gear without pressing the clutch | Simulation stays in neutral and grinds; gear engages once the clutch is pressed | Shift rules |
+| T6 | Stationary on foot brake and handbrake, 1st gear, half throttle, clutch half way, held 90 s (M7) | The clutch starts to smell within 5–80 s; at the end its friction factor is below 0.9 and it transmits over 10 % less torque for the same pedal than at the start; the car never moves | Physics reasoning: long high-rpm slipping burns a clutch |
+| T7 | Five T1-style flat pull-aways in a row (M7) | Clutch temperature rises less than 15 K, no smell, no fade | Normal pull-aways do not hurt the clutch |
+| T8 | Cold engine (0 °C) idling 2 minutes, compared with a warm one (M7) | Cold idle about 300 rpm higher, temperature up more than 5 K after 2 minutes; warm idle 800 ± 50, temperature held at 89–92 °C | Cold engines idle high |
+| T9 | Idle-control usage cold vs warm (M7) | Over 30 % higher when cold | Cold engines have more internal friction |
+| T10 | Warm idle with the air-con on (M7) | Idle about 50 rpm higher (± 30), idle-control usage higher | The air-con is an extra load |
+| T11 | Every car: steady idle; 2.5 s clutch release in 1st with no throttle does not stall; the three cars really differ (M7) | Idle ± 50 rpm; pulls away without stalling and creeps; the diesel makes over 50 Nm more net torque than the Golf at 2000 rpm, the small NA engine over 80 Nm less at 1500 rpm | Every car is drivable and has its own character |
 
 Every time I remember another "my car does this", add a row.
 
@@ -378,3 +388,19 @@ The milestones after M4 (M5–M10: coaching, more exercises, fidelity and other 
 | J7 | Stopping exercises get looser jerk thresholds (queue 40→100, stop-line hill start 60→120): stopping on a slope has an unavoidable acceleration step of about 1 m/s² from gravity alone | Measured with closed-loop scripted drivers: smooth following ~54, a careful stop and pull-away on the hill ~73 |
 | J8 | Calibration (closed-loop scripted driving): queue smooth 88, slow reactions 79, late braking 41; stop-line hill start ideal ~95, 2 m short ~80, heavy throttle ~70; downhill in 2nd 98, 3rd up to 55 km/h 83; reverse gentle 100, harsh 52; downshift with blip 94–99, without 52. S6–S10 (13 tests) pin these intents | As in M4, the tests' intent never changes; only `exercises.json` is tuned |
 | J9 | When the window cannot be opened (e.g. a disconnected remote session with no display) the app says so and exits instead of crashing in raylib | Seen in practice: raylib init failed while the session was disconnected |
+
+## M7 decision record (fidelity and other cars)
+
+2026-10-03, implemented locally. The gate "the effects are noticeable but not exaggerated; the Golf still feels like the Golf; another car feels clearly different" is pending my check on the G29.
+
+| # | Decision | Reason |
+| --- | --- | --- |
+| K1 | Clutch temperature: one lumped heat capacity, heated by slip power (clutch torque × slip speed) and cooling to ambient; above the fade start the friction coefficient falls linearly to a minimum and the capacity with it; above the "smell" temperature there is only a warning, no physics | Slip power is the same slip energy the scoring measures; fade shows up through clutch capacity with no special case (hard rule 2) |
+| K2 | Engine temperature: waste heat proportional to mechanical combustion power warms one lumped heat capacity that cools to ambient, with strong thermostat cooling above operating temperature. Below operating temperature a "cold factor" (1 at 0 °C) adds internal friction and raises the ECU idle target | Cold engines are harder to drive and idle higher, both through the existing friction and idle-control paths |
+| K3 | Air-con: a switch on the driver input; while on it adds a load torque at the crank and the ECU raises idle a little | The air-con making stalls likelier follows from the idle-control reserve |
+| K4 | Engines start warm by default (`engineTempC` null = operating temperature), air-con off, clutch at ambient, so T1–T5 are unchanged; new T6–T10 cover the new effects | New physics must not change the feel already accepted |
+| K5 | `startEngineTempC` in the scene (90 = warm) sets the engine temperature on every restart, for cold-start practice; C toggles the air-con | Starting cold is a scenario choice, not a property of the car |
+| K6 | Other cars: a small naturally aspirated petrol (light, revvy, weak low down, no hill assist) and a 2.0 turbo diesel (heavy flywheel, strong once boosted, low redline). Plausible class figures, not specific models. The list is `config/cars.json`; V picks a car and the panel's Vehicle page switches to that car's file | Without real-car data the aim is "clearly different and plausible" |
+| K7 | T11: every car must idle steadily, pull away on a 2.5 s release without stalling, and really differ. The first diesel draft stalled on a gentle pull-away for lack of torque off boost; low-rpm torque moved from the boost part to the naturally aspirated part, boosted totals unchanged | The test caught implausible parameters; the parameters changed, not the test |
+| K8 | The instrument strip gains CLUTCH (smell, amber), COLD (more than 5 °C below operating temperature, blue) and A/C lights; the panel shows temperatures, clutch friction factor and idle target; telemetry gains four fields | Glass box: whatever the model knows can be seen |
+| K9 | The M4 and M6 scoring needs no recalibration: warm engine and air-con off by default, and normal practice warms the clutch very little, so S1–S10 all still pass | The new effects only matter when abusing the clutch or starting cold |
