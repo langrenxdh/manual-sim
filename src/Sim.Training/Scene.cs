@@ -17,6 +17,8 @@ public sealed record Scene
     public required double HillStartBehindLineM { get; init; }
     public required DownhillParams Downhill { get; init; }
     public required DashboardParams Dashboard { get; init; }
+    /// <summary>Engine temperature on every (re)start (90 = warm). Set it low to practise cold starts (M7).</summary>
+    public required double StartEngineTempC { get; init; }
 
     public double StopLineM => Hill.StartM + Hill.StopLineFromHillStartM;
     public double HillStartPositionM => StopLineM - HillStartBehindLineM;
@@ -80,6 +82,7 @@ public sealed record Scene
         Require(d.BottomStartAfterM >= 0, "downhill.bottomStartAfterM must be >= 0");
         Require(Dashboard.DownshiftRpm > 0 && Dashboard.UpshiftRpm > Dashboard.DownshiftRpm,
             "dashboard.upshiftRpm must be above dashboard.downshiftRpm");
+        Require(StartEngineTempC is >= -30 and <= 120, "startEngineTempC must be within [-30, 120]");
     }
 
     private static void Require(bool condition, string message)

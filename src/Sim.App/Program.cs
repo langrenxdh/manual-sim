@@ -8,7 +8,7 @@ using static Raylib_cs.Raylib;
 // Manual transmission practice simulator (docs/design.en.md).
 // Keys: Tab tuning panel, E exercises, R restart (the road start, or the current exercise),
 // H restart on the hill or the current exercise (also the right paddle), P replay of the last 10 s
-// (also triangle), T teaching mode (also O), F2 first-time setup, F11 borderless fullscreen,
+// (also triangle), T teaching mode (also O), V car, C air-con, F2 first-time setup, F11 borderless fullscreen,
 // Esc leaves an exercise, otherwise quits.
 // --screenshot FILE [--panel] [--hill] [--replay] [--teaching] [--setup] [--menu] [--progress] [--exercise ID] [--frames N] [--size WxH]:
 // save a frame after start-up and exit (checks the visuals without a person). --hill and
@@ -21,7 +21,8 @@ int[] windowSize = args.SkipWhile(a => a != "--size").Skip(1).Select(s => s.Spli
 int frameCount = 0;
 
 var config = ConfigFiles.Locate();
-var vehicle = VehicleParams.FromJson(config.Read(ConfigFiles.VehicleFile));
+string carFile = ConfigFiles.VehicleFile; // the car menu (V) changes it
+var vehicle = VehicleParams.FromJson(config.Read(carFile));
 var input = InputConfig.FromJson(config.Read(ConfigFiles.InputFile));
 var sound = SoundParams.FromJson(config.Read(ConfigFiles.SoundFile));
 var scene = Scene.FromJson(config.Read(ConfigFiles.SceneFile));
@@ -80,7 +81,7 @@ void Restart(bool hill)
 {
     activeExercise = null;
     onHill = hill;
-    physics.Reset(scene.BuildRoad(), hill ? scene.HillStartPositionM : 0, engageHandbrake: hill);
+    physics.Reset(scene.BuildRoad(), hill ? scene.HillStartPositionM : 0, engageHandbrake: hill, scene.StartEngineTempC);
 }
 
 void StartExercise(ExerciseDef e)
@@ -88,7 +89,7 @@ void StartExercise(ExerciseDef e)
     activeExercise = e;
     bool hill = e.Start == StartPoint.HillStart;
     onHill = hill;
-    physics.StartExercise(scene, scene.PositionOf(e.Start), engageHandbrake: hill, exercises, e);
+    physics.StartExercise(scene, scene.PositionOf(e.Start), engageHandbrake: hill, exercises, e, scene.StartEngineTempC);
 }
 
 // R / H / right paddle retry the current exercise; in free driving they are the two restarts.
@@ -98,11 +99,27 @@ void RestartOrRetry(bool hill)
     else Restart(hill);
 }
 
+// The tuning panel's Vehicle document edits whichever car is selected.
+TunableDocument VehicleDocument(string file) =>
+    new("Vehicle", file, typeof(VehicleParams), config.Read(file), VehicleParams.FromJson,
+        o => physics.SubmitParams(vehicle = (VehicleParams)o));
+
+var carMenu = new CarMenu(config);
+TuningPanel? panelRef = null;
+
+void SelectCar(string file)
+{
+    carFile = file;
+    vehicle = VehicleParams.FromJson(config.Read(file));
+    physics.SubmitParams(vehicle);
+    panelRef?.Replace(VehicleDocument(file));
+    if (activeExercise != null) StartExercise(activeExercise);
+    else Restart(onHill);
+}
+
 var panel = new TuningPanel(
 [
-    new TunableDocument("Vehicle", ConfigFiles.VehicleFile, typeof(VehicleParams),
-        config.Read(ConfigFiles.VehicleFile), VehicleParams.FromJson,
-        o => physics.SubmitParams(vehicle = (VehicleParams)o)),
+    VehicleDocument(carFile),
     new TunableDocument("Input", ConfigFiles.InputFile, typeof(InputConfig),
         config.Read(ConfigFiles.InputFile), InputConfig.FromJson,
         o => physics.SubmitInputConfig((InputConfig)o)),
@@ -122,6 +139,7 @@ var panel = new TuningPanel(
         config.Read(ConfigFiles.ExercisesFile), ExerciseConfig.FromJson,
         o => exercises = (ExerciseConfig)o),
 ], config.Save) { Visible = screenshotPanel };
+panelRef = panel;
 
 SetConfigFlags(ConfigFlags.ResizableWindow | ConfigFlags.VSyncHint | ConfigFlags.Msaa4xHint);
 InitWindow(windowSize[0], windowSize[1], "Manual Sim - " + vehicle.Name);
@@ -134,6 +152,7 @@ if (!IsWindowReady())
 SetTargetFPS(60);
 Ui.Load();
 sceneView = new SceneView(scene, camera);
+Restart(hill: false); // applies the scene's start temperature from the first drive
 if (args.Contains("--hill")) Restart(hill: true);
 if (args.Contains("--teaching")) teaching = true;
 if (args.SkipWhile(a => a != "--exercise").Skip(1).FirstOrDefault() is { } exerciseId) StartExercise(exercises.Find(exerciseId));
@@ -173,6 +192,11 @@ while (!WindowShouldClose())
             case ExerciseUi.MenuChoice.FreeDriving: Restart(hill: false); break;
         }
     }
+    else if (carMenu.Open)
+    {
+        if (IsKeyPressed(KeyboardKey.Escape) || IsKeyPressed(KeyboardKey.V)) carMenu.Open = false;
+        else if (carMenu.Update(buttons) is { } chosenCar) SelectCar(chosenCar);
+    }
     else if (progressOpen)
     {
         exerciseUi.UpdateMenu(exercises, buttons, out _); // keeps D-pad edge tracking current
@@ -192,6 +216,8 @@ while (!WindowShouldClose())
         if (IsKeyPressed(KeyboardKey.H)) RestartOrRetry(hill: true);
         if (IsKeyPressed(KeyboardKey.P)) ToggleReplay(frame.Exercise.Result);
         if (IsKeyPressed(KeyboardKey.T)) ToggleTeaching();
+        if (IsKeyPressed(KeyboardKey.V)) carMenu.Open = true;
+        if (IsKeyPressed(KeyboardKey.C)) physics.AirConOn = !physics.AirConOn;
         if (IsKeyPressed(KeyboardKey.F2)) setupScreen.Open(setup);
         if (buttons.HillStart && !previousButtons.HillStart) RestartOrRetry(hill: true);
         if (buttons.Replay && !previousButtons.Replay) ToggleReplay(frame.Exercise.Result);
@@ -247,6 +273,7 @@ while (!WindowShouldClose())
         ExerciseUi.DrawResult(frame.Exercise, scoreHistory, centre);
     }
     exerciseUi.DrawMenu(exercises, scoreHistory, teaching ? TeachingOverlay.Centre(roadArea) : roadArea);
+    carMenu.Draw(carFile, roadArea);
     Dashboard.Draw(frame, vehicle, scene.Dashboard, new Rectangle(viewArea.X, viewArea.Y + roadHeight, viewArea.Width, viewArea.Height - roadHeight));
     if (!panel.Visible)
         Ui.Text($"physics {frame.PhysicsHz:F0} Hz  overruns {frame.Overruns}   Tab: tuning panel", 8, h - 24, 18, Color.Gray);

@@ -48,9 +48,13 @@ public sealed class PhysicsLoop : IDisposable
     private VehicleParams? _pendingParams;
     private InputConfig? _pendingInputConfig;
     private ResetRequest? _pendingReset;
+    private volatile bool _airConOn;
+
+    /// <summary>Air-con switch (M7), set from the UI; applied to the driver input every step.</summary>
+    public bool AirConOn { get => _airConOn; set => _airConOn = value; }
 
     private sealed record ResetRequest(Road Road, double PositionM, bool EngageHandbrake,
-        ExerciseConfig? Exercises, ExerciseDef? Exercise, Scene? Scene);
+        ExerciseConfig? Exercises, ExerciseDef? Exercise, Scene? Scene, double? EngineTempC);
 
     // Physics-thread state for graded exercises (null in free driving).
     private ExerciseConfig? _exercises;
@@ -82,16 +86,17 @@ public sealed class PhysicsLoop : IDisposable
     /// Restarts the car at rest, in neutral, at idle, at a position on a road. On a hill the handbrake
     /// is usually engaged so the car does not roll back before the driver reacts.
     /// </summary>
-    public void Reset(Road road, double positionM, bool engageHandbrake) =>
-        Volatile.Write(ref _pendingReset, new ResetRequest(road, positionM, engageHandbrake, null, null, null));
+    public void Reset(Road road, double positionM, bool engageHandbrake, double? engineTempC = null) =>
+        Volatile.Write(ref _pendingReset, new ResetRequest(road, positionM, engageHandbrake, null, null, null, engineTempC));
 
     /// <summary>
     /// Restarts the car for a new attempt at an exercise. The physics runs with the exercise's
     /// hill-assist setting and every step is scored until the attempt ends. Free driving resumes
     /// with the next plain <see cref="Reset"/>.
     /// </summary>
-    public void StartExercise(Scene scene, double positionM, bool engageHandbrake, ExerciseConfig exercises, ExerciseDef exercise) =>
-        Volatile.Write(ref _pendingReset, new ResetRequest(scene.BuildRoad(), positionM, engageHandbrake, exercises, exercise, scene));
+    public void StartExercise(Scene scene, double positionM, bool engageHandbrake, ExerciseConfig exercises, ExerciseDef exercise,
+        double? engineTempC = null) =>
+        Volatile.Write(ref _pendingReset, new ResetRequest(scene.BuildRoad(), positionM, engageHandbrake, exercises, exercise, scene, engineTempC));
 
     private void Run()
     {
@@ -130,8 +135,9 @@ public sealed class PhysicsLoop : IDisposable
                     sim = ApplyPending(sim, reader);
                     var sample = reader?.Poll(Simulator.StepS)
                         ?? new InputSample(new DriverInput(0, 0, 0, Gear.Neutral), false, 0, 0, 0, false);
-                    sim.Step(sample.Input);
-                    _session?.Observe(sim.State, sample.Input, Simulator.StepS);
+                    var driven = sample.Input with { AirCon = AirConOn };
+                    sim.Step(driven);
+                    _session?.Observe(sim.State, driven, Simulator.StepS);
                     stepsDone++;
                     stepsInWindow++;
 
@@ -180,7 +186,7 @@ public sealed class PhysicsLoop : IDisposable
         var vehicle = Effective();
         _session = _exercises != null && _exercise != null ? new ExerciseSession(_exercises, _exercise, vehicle, r.Scene) : null;
         _attemptId++;
-        return new Simulator(vehicle, r.Road, positionM: r.PositionM);
+        return new Simulator(vehicle, r.Road, positionM: r.PositionM, engineTempC: r.EngineTempC);
     }
 
     /// <summary>The tuned vehicle, with the current exercise's hill-assist setting if one is running.</summary>

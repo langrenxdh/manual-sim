@@ -1,6 +1,7 @@
 // Scene (docs/design.md 坡道与起步辅助 / design.en.md Hills and hill-start assist; M6 downhill): a straight
 // road, flat, then an uphill section with a stop line, a flat plateau, a downhill section, flat again.
 // Grades change linearly over each transition. Distances in metres along the road.
+// startEngineTempC: engine temperature at every restart (90 = warm); e.g. 5 to practise cold starts (M7).
 {
   "hill": {
     "startM": 150,
@@ -10,6 +11,7 @@
     "stopLineFromHillStartM": 60
   },
   "hillStartBehindLineM": 6,
+  "startEngineTempC": 90,
   "downhill": {
     "plateauM": 100,
     "lengthM": 200,

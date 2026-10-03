@@ -47,6 +47,10 @@ public static class TelemetryFields
         ("hillHoldState", f => (float)f.State.HillHold),
         ("hillHoldRemainingS", f => (float)f.State.HillHoldRemainingS),
         ("hillHoldForceN", f => (float)f.State.HillHoldForceN),
+        ("clutchTempC", f => (float)f.State.ClutchTempC),
+        ("clutchFrictionFactor", f => (float)f.State.ClutchFrictionFactor),
+        ("engineTempC", f => (float)f.State.EngineTempC),
+        ("airCon", f => f.State.AirCon ? 1 : 0),
     ];
 
     public static int IndexOf(string name) => Array.FindIndex(All, f => f.Name == name);

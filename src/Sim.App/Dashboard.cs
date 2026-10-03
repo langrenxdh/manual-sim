@@ -62,7 +62,10 @@ public static class Dashboard
         Lights(cx, r.Y + r.Height * 0.66f,
             ("ENGINE", engineOff, Redline),
             ("(P)", f.Input.Input.Handbrake, Redline),
-            ("HOLD", s.HillHold != HillHoldState.Inactive, new Color(60, 200, 90, 255)));
+            ("HOLD", s.HillHold != HillHoldState.Inactive, new Color(60, 200, 90, 255)),
+            ("CLUTCH", s.ClutchSmell, new Color(255, 170, 40, 255)),
+            ("COLD", s.EngineTempC < p.EngineThermal.WarmC - ColdLightBelowWarmC, new Color(80, 150, 255, 255)),
+            ("A/C", s.AirCon, new Color(60, 200, 90, 255)));
 
         string status = f.InputError != null ? $"input error: {f.InputError}"
             : !f.Input.Connected ? "NO WHEEL - plug in the G29 (PS3 mode)"
@@ -110,6 +113,8 @@ public static class Dashboard
             DrawTriangle(new Vector2(x - size, cy - size), new Vector2(x, cy + size), new Vector2(x + size, cy - size), Dial);
     }
 
+    /// <summary>The blue "cold engine" light shows while the engine is this far below operating temperature.</summary>
+    private const double ColdLightBelowWarmC = 5;
     private const float LightTextSize = 26;
     private const float LightGap = 24;
 

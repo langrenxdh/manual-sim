@@ -38,7 +38,7 @@ public sealed class TuningPanel
     private static readonly Color ErrorColour = new(255, 110, 90, 255);
     private static readonly Color Good = new(110, 210, 130, 255);
 
-    private readonly IReadOnlyList<TunableDocument> _docs;
+    private readonly List<TunableDocument> _docs;
     private readonly Action<string, string> _save;
     private readonly HashSet<string> _expanded = [];
     private List<Row> _rows = [];
@@ -54,9 +54,18 @@ public sealed class TuningPanel
     /// <param name="save">Writes (file name, JSON text) to config/.</param>
     public TuningPanel(IReadOnlyList<TunableDocument> docs, Action<string, string> save)
     {
-        _docs = docs;
+        _docs = [.. docs];
         _save = save;
         foreach (var d in docs) _expanded.Add(d.Title);
+        Rebuild();
+    }
+
+    /// <summary>Swaps the document with the same title (e.g. the Vehicle document when the car changes).</summary>
+    public void Replace(TunableDocument doc)
+    {
+        int i = _docs.FindIndex(d => d.Title == doc.Title);
+        if (i < 0) throw new ArgumentException($"No panel document titled \"{doc.Title}\".");
+        _docs[i] = doc;
         Rebuild();
     }
 
@@ -153,7 +162,7 @@ public sealed class TuningPanel
         Line($"idle control {s.IdleControlUsage * 100:F0} % of {p.IdleControl.MaxTorqueNm:F0} Nm   " +
              $"throttle {s.Throttle * 100:F0} %");
         Line($"combustion {s.CombustionTorqueNm:F0} Nm   friction {s.FrictionTorqueNm:F0} Nm   boost {s.Boost:F2}");
-        Line($"shudder {s.ShudderIntensity:F2}");
+        Line($"shudder {s.ShudderIntensity:F2}   clutch {s.ClutchTempC:F0} C x{s.ClutchFrictionFactor:F2}   engine {s.EngineTempC:F0} C   idle target {s.IdleTargetRpm:F0}{(s.AirCon ? "   A/C" : "")}");
         Line($"speed {s.SpeedKmh:F1} km/h   accel {s.AccelerationMps2 / p.Environment.GravityMps2:F2} g   " +
              $"grade {s.Grade * 100:F1} %");
         Line($"hill hold {s.HillHold}   {s.HillHoldRemainingS:F1} s   {s.HillHoldForceN:F0} N");

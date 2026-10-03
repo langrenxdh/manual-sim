@@ -1,0 +1,4 @@
+// Cars offered in the car menu (V). Each entry is a vehicle file in this folder (M7).
+{
+  "cars": ["golf-110tsi.json", "small-na-1.5.json", "diesel-2.0-turbo.json"]
+}
