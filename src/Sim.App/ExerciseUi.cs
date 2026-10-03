@@ -26,35 +26,48 @@ public sealed class ExerciseUi
 
     public bool MenuOpen { get; set; }
 
-    public enum MenuChoice { None, Exercise, Progress, FreeDriving }
+    public enum MenuChoice { None, Exercise, Exam, Progress, FreeDriving }
 
-    /// <summary>Menu input. The rows are the exercises, then "Progress", then "Free driving".</summary>
-    public MenuChoice UpdateMenu(ExerciseConfig config, UiButtons buttons, out ExerciseDef? exercise)
+    /// <summary>Menu rows: the exercises, then the exams, then "Progress", then "Free driving".</summary>
+    private static int RowCount(ExerciseConfig c) => c.Exercises.Length + c.Exams.Length + 2;
+
+    /// <summary>Menu input; the chosen exercise or exam comes back through the out parameters.</summary>
+    public MenuChoice UpdateMenu(ExerciseConfig config, UiButtons buttons, out ExerciseDef? exercise, out ExamDef? exam)
     {
         exercise = null;
+        exam = null;
         bool up = IsKeyPressed(KeyboardKey.Up) || (buttons.PadUp && !_previous.PadUp);
         bool down = IsKeyPressed(KeyboardKey.Down) || (buttons.PadDown && !_previous.PadDown);
         bool choose = IsKeyPressed(KeyboardKey.Enter) || IsKeyPressed(KeyboardKey.KpEnter) || (buttons.PadRight && !_previous.PadRight);
         _previous = buttons;
         if (!MenuOpen) return MenuChoice.None;
 
-        int count = config.Exercises.Length + 2;
+        int count = RowCount(config);
         if (up) _selected = (_selected + count - 1) % count;
         if (down) _selected = (_selected + 1) % count;
         _selected = Math.Clamp(_selected, 0, count - 1);
         if (!choose) return MenuChoice.None;
 
         MenuOpen = false;
-        if (_selected == config.Exercises.Length) return MenuChoice.Progress;
-        if (_selected == config.Exercises.Length + 1) return MenuChoice.FreeDriving;
-        exercise = config.Exercises[_selected];
-        return MenuChoice.Exercise;
+        int n = config.Exercises.Length, m = config.Exams.Length;
+        if (_selected < n)
+        {
+            exercise = config.Exercises[_selected];
+            return MenuChoice.Exercise;
+        }
+        if (_selected < n + m)
+        {
+            exam = config.Exams[_selected - n];
+            return MenuChoice.Exam;
+        }
+        return _selected == n + m ? MenuChoice.Progress : MenuChoice.FreeDriving;
     }
 
     public void DrawMenu(ExerciseConfig config, ScoreHistory history, Rectangle area)
     {
         if (!MenuOpen) return;
-        int count = config.Exercises.Length + 2;
+        int count = RowCount(config);
+        int exams = config.Exams.Length;
         float mw = Math.Min(MenuWidth, area.Width - 16);
         // Scroll when the rows do not fit the road view: keep the selected row visible.
         int fits = Math.Max(1, (int)((area.Height - 40 - 90 - 20) / RowHeight));
@@ -71,13 +84,24 @@ public sealed class ExerciseUi
         {
             float y = r.Y + 90 + (i - _scroll) * RowHeight;
             if (i == _selected) DrawRectangle((int)r.X + 12, (int)y, (int)r.Width - 24, (int)RowHeight - 4, Highlight);
-            if (i == config.Exercises.Length)
+            int n = config.Exercises.Length;
+            if (i >= n && i < n + exams)
+            {
+                var x = config.Exams[i - n];
+                Ui.Text($"Exam: {x.Name}", r.X + 28, y + 4, 24, Warn);
+                Ui.Text($"{x.Parts.Length} parts in a row, no retries; pass with every part done and an average of {x.PassAverage:F0}.",
+                    r.X + 28, y + 30, 15, Muted);
+                string examBest = history.Best(ExamHistoryId(x)) is double eb ? $"best {eb:F0}" : "not passed yet";
+                Ui.Text(examBest, r.X + r.Width - 28 - Ui.Width(examBest, 17), y + 8, 17, history.Best(ExamHistoryId(x)) is null ? Muted : Good);
+                continue;
+            }
+            if (i == n + exams)
             {
                 Ui.Text("Progress", r.X + 28, y + 4, 24, Fg);
                 Ui.Text("Scores over time, trend and what most often costs points.", r.X + 28, y + 30, 15, Muted);
                 continue;
             }
-            if (i == config.Exercises.Length + 1)
+            if (i == n + exams + 1)
             {
                 Ui.Text("Free driving", r.X + 28, y + 14, 24, Fg);
                 continue;
@@ -154,6 +178,44 @@ public sealed class ExerciseUi
         string advice = biggest != null ? $"Work on: {Advice(biggest.Metric)}" : res.Failed ? "" : "Clean run.";
         Ui.Text(advice, x0, y, 19, biggest != null ? Warn : Good);
         Ui.Text("R retry   E exercises   Esc free driving   triangle replay", x0, r.Y + h - 32, 17, Muted);
+    }
+
+    /// <summary>The id an exam's overall result is kept under in the score history.</summary>
+    public static string ExamHistoryId(ExamDef exam) => "exam:" + exam.Id;
+
+    /// <summary>Under the result card during an exam: which part this was and what comes next.</summary>
+    public static void DrawExamProgress(ExamRun run, Rectangle area)
+    {
+        string text = run.Done ? "Exam finished: Enter shows the result." : $"Exam part {run.PartNumber - 1} of {run.Exam.Parts.Length} done.   Enter: next part";
+        float w = Ui.Width(text, 20) + 40;
+        var r = new Rectangle(area.X + (area.Width - w) / 2, area.Y + area.Height - 60, w, 40);
+        DrawRectangleRounded(r, 0.3f, 6, Bg);
+        Ui.Centred(text, r.X + w / 2, r.Y + 10, 20, Warn);
+    }
+
+    /// <summary>The exam verdict: every part's score and whether it passed.</summary>
+    public static void DrawExamSummary(ExamRun run, ExerciseConfig config, Rectangle area)
+    {
+        float cw = Math.Min(CardWidth, area.Width - 16);
+        float h = 150 + run.Results.Count * 30 + 50;
+        var r = new Rectangle(area.X + (area.Width - cw) / 2, area.Y + 30, cw, h);
+        DrawRectangleRounded(r, 0.04f, 6, Bg);
+        float x0 = r.X + 28, y = r.Y + 18;
+        bool passed = run.Passed == true;
+        Ui.Text($"Exam: {run.Exam.Name}", x0, y, 30, Fg);
+        Ui.Text(passed ? "PASSED" : "NOT PASSED", x0, y + 40, 26, passed ? Good : Bad);
+        string avg = $"average {run.Average:F0} (pass {run.Exam.PassAverage:F0})";
+        Ui.Text(avg, r.X + r.Width - 28 - Ui.Width(avg, 20), y + 46, 20, Fg);
+        y += 90;
+        foreach (var res in run.Results)
+        {
+            string name = config.Exercises.FirstOrDefault(e => e.Id == res.ExerciseId)?.Name ?? res.ExerciseId;
+            Ui.Text(name, x0, y, 19, Fg);
+            string outcome = res.Failed ? $"failed: {res.FailReason}" : $"{res.Score:F0}  {res.Grade}";
+            Ui.Text(outcome, x0 + cw * 0.55f, y, 19, res.Failed ? Bad : Fg);
+            y += 30;
+        }
+        Ui.Text("Enter or E: exercises   Esc: free driving", x0, r.Y + h - 32, 17, Muted);
     }
 
     /// <summary>A history "main issue" (a metric name or a failure reason) in words.</summary>

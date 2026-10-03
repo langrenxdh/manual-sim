@@ -16,6 +16,7 @@ public sealed class ConfigFiles
     public const string SetupExampleFile = "setup.example.json";
     public const string ExercisesFile = "exercises.json";
     public const string CarsFile = "cars.json";
+    public const string CuesFile = "cues.json";
 
     public string Directory { get; }
 

@@ -9,7 +9,7 @@ using static Raylib_cs.Raylib;
 // Keys: Tab tuning panel, E exercises, R restart (the road start, or the current exercise),
 // H restart on the hill or the current exercise (also the right paddle), P replay of the last 10 s
 // (also triangle), T teaching mode (also O), V car, C air-con, F2 first-time setup, F11 borderless fullscreen,
-// Esc leaves an exercise, otherwise quits.
+// E also lists the exams (Enter between exam parts), Esc leaves an exercise or exam, otherwise quits.
 // --screenshot FILE [--panel] [--hill] [--replay] [--teaching] [--setup] [--menu] [--progress] [--exercise ID] [--frames N] [--size WxH]:
 // save a frame after start-up and exit (checks the visuals without a person). --hill and
 // --exercise ID also work on their own.
@@ -37,6 +37,16 @@ string dataRoot = screenshotPath != null
 var scoreHistory = new ScoreHistory(Path.Combine(dataRoot, "scores"));
 var exerciseUi = new ExerciseUi();
 ExerciseDef? activeExercise = null; // null = free driving
+ExamRun? examRun = null;             // set while an exam (M8) is being driven
+bool examSummaryOpen = false;
+// Teaching-mode cues (M8): rules from cues.json, spoken and shown briefly on screen.
+var cueConfig = CueConfig.FromJson(config.Read(ConfigFiles.CuesFile));
+CueEngine? cueEngine = null;
+VehicleParams? cueVehicle = null;
+string? cueText = null;
+double cueShownAt = double.MinValue;
+const double CueShowS = 2.5;
+using var speaker = new Speaker();
 long recordedAttempt = -1;
 // Machine-specific setup; until it has run, the FOV comes from camera.json and the rest from the example.
 bool setupDone = config.Exists(ConfigFiles.SetupFile);
@@ -80,6 +90,8 @@ void ToggleReplay(ScoreResult? finishedAttempt)
 void Restart(bool hill)
 {
     activeExercise = null;
+    examRun = null; // leaving an exam abandons it
+    examSummaryOpen = false;
     onHill = hill;
     physics.Reset(scene.BuildRoad(), hill ? scene.HillStartPositionM : 0, engageHandbrake: hill, scene.StartEngineTempC);
 }
@@ -93,10 +105,27 @@ void StartExercise(ExerciseDef e)
 }
 
 // R / H / right paddle retry the current exercise; in free driving they are the two restarts.
+// An exam has no retries, so they do nothing during one.
 void RestartOrRetry(bool hill)
 {
+    if (examRun != null) return;
     if (activeExercise != null) StartExercise(activeExercise);
     else Restart(hill);
+}
+
+void StartExam(ExamDef exam)
+{
+    examRun = new ExamRun(exam);
+    examSummaryOpen = false;
+    StartExercise(exercises.Find(exam.Parts[0]));
+}
+
+// Enter after an exam part: the next part, or the verdict after the last one.
+void AdvanceExam()
+{
+    if (examRun == null) return;
+    if (examRun.NextPart is { } next) StartExercise(exercises.Find(next));
+    else examSummaryOpen = true;
 }
 
 // The tuning panel's Vehicle document edits whichever car is selected.
@@ -138,6 +167,9 @@ var panel = new TuningPanel(
     new TunableDocument("Exercises (apply to the next attempt)", ConfigFiles.ExercisesFile, typeof(ExerciseConfig),
         config.Read(ConfigFiles.ExercisesFile), ExerciseConfig.FromJson,
         o => exercises = (ExerciseConfig)o),
+    new TunableDocument("Cues (teaching mode)", ConfigFiles.CuesFile, typeof(CueConfig),
+        config.Read(ConfigFiles.CuesFile), CueConfig.FromJson,
+        o => { cueConfig = (CueConfig)o; cueVehicle = null; }),
 ], config.Save) { Visible = screenshotPanel };
 panelRef = panel;
 
@@ -185,9 +217,10 @@ while (!WindowShouldClose())
     else if (exerciseUi.MenuOpen)
     {
         if (IsKeyPressed(KeyboardKey.Escape) || IsKeyPressed(KeyboardKey.E)) exerciseUi.MenuOpen = false;
-        else switch (exerciseUi.UpdateMenu(exercises, buttons, out var chosen))
+        else switch (exerciseUi.UpdateMenu(exercises, buttons, out var chosen, out var chosenExam))
         {
             case ExerciseUi.MenuChoice.Exercise: StartExercise(chosen!); break;
+            case ExerciseUi.MenuChoice.Exam: StartExam(chosenExam!); break;
             case ExerciseUi.MenuChoice.Progress: progressOpen = true; break;
             case ExerciseUi.MenuChoice.FreeDriving: Restart(hill: false); break;
         }
@@ -199,18 +232,25 @@ while (!WindowShouldClose())
     }
     else if (progressOpen)
     {
-        exerciseUi.UpdateMenu(exercises, buttons, out _); // keeps D-pad edge tracking current
+        exerciseUi.UpdateMenu(exercises, buttons, out _, out _); // keeps D-pad edge tracking current
         if (IsKeyPressed(KeyboardKey.Escape) || IsKeyPressed(KeyboardKey.E)) progressOpen = false;
     }
     else
     {
-        exerciseUi.UpdateMenu(exercises, buttons, out _); // keeps D-pad edge tracking current
+        exerciseUi.UpdateMenu(exercises, buttons, out _, out _); // keeps D-pad edge tracking current
         if (IsKeyPressed(KeyboardKey.Escape))
         {
             if (activeExercise == null) break;
             Restart(hill: false);
         }
-        if (IsKeyPressed(KeyboardKey.E)) exerciseUi.MenuOpen = true;
+        bool enter = IsKeyPressed(KeyboardKey.Enter) || IsKeyPressed(KeyboardKey.KpEnter);
+        if (examSummaryOpen && (enter || IsKeyPressed(KeyboardKey.E)))
+        {
+            Restart(hill: false);
+            exerciseUi.MenuOpen = true;
+        }
+        else if (examRun != null && enter && frame.Exercise.Result != null) AdvanceExam();
+        else if (IsKeyPressed(KeyboardKey.E)) exerciseUi.MenuOpen = true;
         if (IsKeyPressed(KeyboardKey.Tab)) panel.Visible = !panel.Visible;
         if (IsKeyPressed(KeyboardKey.R)) RestartOrRetry(hill: false);
         if (IsKeyPressed(KeyboardKey.H)) RestartOrRetry(hill: true);
@@ -229,6 +269,24 @@ while (!WindowShouldClose())
     {
         recordedAttempt = frame.Exercise.AttemptId;
         scoreHistory.Record(result);
+        if (examRun != null && result.ExerciseId == examRun.NextPart)
+        {
+            examRun.Record(result);
+            if (examRun.Done) scoreHistory.RecordExam(ExerciseUi.ExamHistoryId(examRun.Exam), examRun);
+        }
+    }
+
+    // Teaching-mode cues: spoken, and shown for a moment at the bottom of the road view.
+    if (!ReferenceEquals(cueVehicle, vehicle))
+    {
+        cueEngine = new CueEngine(cueConfig, vehicle);
+        cueVehicle = vehicle;
+    }
+    if (cueEngine!.Update(frame.State, GetFrameTime()) is { } cue && teaching)
+    {
+        speaker.Say(cue.Say);
+        cueText = cue.Say;
+        cueShownAt = GetTime();
     }
     previousButtons = buttons;
     if (IsKeyPressed(KeyboardKey.F11)) ToggleBorderlessWindowed();
@@ -270,8 +328,15 @@ while (!WindowShouldClose())
         // With teaching mode on, stay between its side boxes so neither covers the other.
         var centre = teaching ? TeachingOverlay.Centre(roadArea) : roadArea;
         ExerciseUi.DrawBanner(frame.Exercise, centre);
-        ExerciseUi.DrawResult(frame.Exercise, scoreHistory, centre);
+        if (examSummaryOpen && examRun != null) ExerciseUi.DrawExamSummary(examRun, exercises, centre);
+        else
+        {
+            ExerciseUi.DrawResult(frame.Exercise, scoreHistory, centre);
+            if (examRun != null && frame.Exercise.Result != null) ExerciseUi.DrawExamProgress(examRun, centre);
+        }
     }
+    if (cueText != null && GetTime() - cueShownAt < CueShowS)
+        Ui.Centred(cueText, roadArea.X + roadArea.Width / 2, roadArea.Y + roadArea.Height - 50, 30, Color.White);
     exerciseUi.DrawMenu(exercises, scoreHistory, teaching ? TeachingOverlay.Centre(roadArea) : roadArea);
     carMenu.Draw(carFile, roadArea);
     Dashboard.Draw(frame, vehicle, scene.Dashboard, new Rectangle(viewArea.X, viewArea.Y + roadHeight, viewArea.Width, viewArea.Height - roadHeight));

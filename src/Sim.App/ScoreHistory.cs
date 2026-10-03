@@ -87,6 +87,37 @@ public sealed class ScoreHistory
         Add(record);
     }
 
+    /// <summary>Appends a finished exam: its average as the score, not passed counting as failed (M8).</summary>
+    public void RecordExam(string historyId, ExamRun run)
+    {
+        var record = new AttemptRecord(DateTime.Now, historyId, run.Average, run.Passed != true,
+            run.Passed == true ? null : run.FailedParts.Any() ? "a part failed" : "average below the pass mark");
+        var line = new JsonObject
+        {
+            ["time"] = record.Time.ToString("s", CultureInfo.InvariantCulture),
+            ["exercise"] = historyId,
+            ["score"] = Math.Round(run.Average, 1),
+            ["failed"] = record.Failed,
+            ["mainIssue"] = record.MainIssue,
+            ["parts"] = new JsonArray(run.Results.Select(r => (JsonNode)new JsonObject
+            {
+                ["exercise"] = r.ExerciseId,
+                ["score"] = Math.Round(r.Score, 1),
+                ["failed"] = r.Failed,
+            }).ToArray()),
+        };
+        try
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
+            File.AppendAllText(_path, line.ToJsonString() + "\n");
+        }
+        catch (IOException ex)
+        {
+            Error = $"score history: {ex.Message}";
+        }
+        Add(record);
+    }
+
     /// <summary>The best completed attempt's trace, or null if there is none yet.</summary>
     public IReadOnlyList<TraceSample>? Ghost(string exerciseId)
     {
