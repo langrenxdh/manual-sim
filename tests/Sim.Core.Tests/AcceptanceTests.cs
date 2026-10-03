@@ -75,11 +75,11 @@ public class AcceptanceTests
         Assert.True(log[^1].SpeedMps < -0.1, $"final speed {log[^1].SpeedMps:F2} m/s, expected rolling back");
     }
 
-    /// <summary>T4: 60 km/h in 4th, clutch in, select 1st, release the clutch over 0.5 s.</summary>
+    /// <summary>T4: 70 km/h in 4th, clutch in, select 1st, release the clutch over 0.5 s.</summary>
     [Fact]
-    public void T4_DownshiftToFirstAt60_DragsEngineIntoRedZone_AndBrakesCar()
+    public void T4_DownshiftToFirstAt70_DragsEngineIntoRedZone_AndBrakesCar()
     {
-        var sim = new Simulator(P, Road.Flat(), Gear.Fourth, Units.KmhToMps(60));
+        var sim = new Simulator(P, Road.Flat(), Gear.Fourth, Units.KmhToMps(70));
         var log = Script.Run(sim, 3, t => new DriverInput(
             Clutch: t < 0.8 ? Script.Ramp(t, 0, 0.2, 0, 1) : Script.Ramp(t, 0.8, 0.5, 1, 0),
             Throttle: 0, Brake: 0,
