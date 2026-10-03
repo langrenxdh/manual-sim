@@ -324,7 +324,7 @@ The milestones after M4 (M5–M10: coaching, more exercises, fidelity and other 
 
 ## M4 decision record
 
-2026-10-03, implemented locally. The gate "scores rank my attempts the way I would and the main deduction names the real mistake" is pending my check on the G29; the result goes here.
+2026-10-03, implemented locally. **Gate reached**: exercises tried on the G29 and accepted ("all good"). Two fixes followed: exercises finish in the target gear or higher, and the exercise banner and result card no longer cover the teaching boxes.
 
 | # | Decision | Reason |
 | --- | --- | --- |

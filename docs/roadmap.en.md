@@ -43,8 +43,8 @@ v1 (M0–M3) is complete, and M4 (graded exercises and scoring) is built. This d
 ### M4 close-out — graded exercises and scoring
 
 - [x] Exercises finish in the target gear or higher (fixed; previously they could hang until the time limit).
-- [ ] The right-hand box sometimes disappears: waiting for details (which box, and when). One known case: with the Tab panel open, the result card can cover the right teaching box.
-- [ ] Gate: scores rank attempts the way you would, and the main deduction names the real mistake.
+- [x] The right-hand box sometimes disappears: the known case (the result card covering the right teaching box) is fixed; in a too-narrow view the two teaching boxes now stack on the left.
+- [x] Gate: scores rank attempts the way you would, and the main deduction names the real mistake (accepted).
 - [ ] Push and open a PR.
 
 ### M5 — Coaching I: ghost comparison and progress (ideas 5, 6)
