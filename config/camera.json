@@ -1,0 +1,14 @@
+// Driver's-eye camera (docs/design.md, 反馈通道 / 画面; design.en.md, Feedback channels / Visuals).
+// Presentation only: reads physics state, never writes it. Body pitch is a spring-damper driven by
+// longitudinal acceleration (positive = nose up). Shake follows judder intensity.
+{
+  "eyeHeightM": 1.2,
+  "driverLateralOffsetM": 0.35,
+  "defaultVerticalFovDeg": 45,
+  "bodyPitchDegPerG": 2.0,
+  "bodyPitchFrequencyHz": 1.4,
+  "bodyPitchDampingRatio": 0.35,
+  "shakePitchDeg": 0.12,
+  "shakeHeightM": 0.003,
+  "drawDistanceM": 600
+}

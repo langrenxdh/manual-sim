@@ -9,7 +9,7 @@
     "transitionM": 15,
     "stopLineFromHillStartM": 60
   },
-  "hillStartBehindLineM": 1.5,
+  "hillStartBehindLineM": 6,
   "dashboard": {
     "upshiftRpm": 2500,
     "downshiftRpm": 1200

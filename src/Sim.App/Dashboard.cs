@@ -6,8 +6,8 @@ using static Raylib_cs.Raylib;
 namespace Sim.App;
 
 /// <summary>
-/// M2 visuals: a simple perspective road for optical flow, and a Golf-style instrument strip
-/// (tachometer, speedometer, gear, warning lights). Display only; reads one <see cref="Frame"/>.
+/// Golf-style instrument strip below the road view: tachometer, speedometer, gear, warning lights.
+/// Display only; reads one <see cref="Frame"/>.
 /// </summary>
 public static class Dashboard
 {
@@ -17,22 +17,6 @@ public static class Dashboard
     private const double TachMaxRpm = 7000;
     private const double SpeedoMaxKmh = 220;
 
-    // Road view geometry (metres). Lane markings follow Australian practice: 3 m dash, 9 m gap.
-    private const double EyeHeightM = 1.2;
-    private const double LaneWidthM = 3.5;
-    private const double LineWidthM = 0.12;
-    private const double DashLengthM = 3;
-    private const double DashPeriodM = 12;
-    private const double PostSpacingM = 25;
-    private const double PostHeightM = 1.0;
-    private const double PostOffsetM = 1.5;
-    private const double FocalLengthPerWidth = 0.8; // ~64 deg horizontal; M3 derives FOV from the real screen
-    private const double FarClipM = 400;
-
-    private static readonly Color Sky = new(150, 185, 215, 255);
-    private static readonly Color Grass = new(85, 120, 70, 255);
-    private static readonly Color Asphalt = new(70, 70, 75, 255);
-    private static readonly Color Marking = new(235, 235, 235, 255);
     private static readonly Color PanelBg = new(18, 18, 22, 255);
     private static readonly Color Dial = new(225, 225, 230, 255);
     private static readonly Color Needle = new(255, 90, 40, 255);
@@ -41,59 +25,9 @@ public static class Dashboard
 
     public static void Draw(in Frame f, VehicleParams p, Rectangle area)
     {
-        float roadHeight = area.Height * 0.68f;
         BeginScissorMode((int)area.X, (int)area.Y, (int)area.Width, (int)area.Height);
-        DrawRoad(f.State, new Rectangle(area.X, area.Y, area.Width, roadHeight));
-        DrawInstruments(f, p, new Rectangle(area.X, area.Y + roadHeight, area.Width, area.Height - roadHeight));
+        DrawInstruments(f, p, area);
         EndScissorMode();
-    }
-
-    private static void DrawRoad(in SimState s, Rectangle r)
-    {
-        int x0 = (int)r.X, w = (int)r.Width;
-        int horizon = (int)(r.Y + r.Height * 0.45f);
-        int bottom = (int)(r.Y + r.Height);
-        double focal = r.Width * FocalLengthPerWidth;
-        double cx = r.X + r.Width * 0.5;
-
-        DrawRectangle(x0, (int)r.Y, w, horizon - (int)r.Y, Sky);
-        DrawRectangle(x0, horizon, w, bottom - horizon, Grass);
-
-        // Ego lane centred on the camera; the dashed centre line is on the right (driving on the left).
-        double leftEdge = -LaneWidthM / 2, centreLine = LaneWidthM / 2, rightEdge = LaneWidthM * 1.5;
-        double pos = s.PositionM;
-        int ScreenX(double xM, double z) => (int)(cx + focal * xM / z);
-
-        for (int y = horizon + 1; y < bottom; y++)
-        {
-            double z = focal * EyeHeightM / (y - horizon);
-            if (z > FarClipM) continue;
-            int left = ScreenX(leftEdge, z), right = ScreenX(rightEdge, z);
-            DrawRectangle(left, y, right - left, 1, Asphalt);
-            int lw = Math.Max(1, (int)(focal * LineWidthM / z));
-            DrawRectangle(left, y, lw, 1, Marking);
-            DrawRectangle(ScreenX(rightEdge, z) - lw, y, lw, 1, Marking);
-            if (Mod(z + pos, DashPeriodM) < DashLengthM)
-                DrawRectangle(ScreenX(centreLine, z) - lw / 2, y, lw, 1, Marking);
-        }
-
-        // Roadside posts, far to near so near ones overlap.
-        double firstAhead = PostSpacingM - Mod(pos, PostSpacingM);
-        for (double z = firstAhead + PostSpacingM * Math.Floor(FarClipM / PostSpacingM); z >= firstAhead; z -= PostSpacingM)
-        {
-            double zEye = Math.Max(z, 1.0);
-            int baseY = horizon + (int)(focal * EyeHeightM / zEye);
-            int topY = horizon + (int)(focal * (EyeHeightM - PostHeightM) / zEye);
-            int pw = Math.Max(2, (int)(focal * 0.15 / zEye));
-            foreach (double side in new[] { leftEdge - PostOffsetM, rightEdge + PostOffsetM })
-            {
-                int px = ScreenX(side, zEye);
-                if (baseY < bottom) DrawRectangle(px - pw / 2, topY, pw, Math.Min(baseY, bottom) - topY, Marking);
-            }
-        }
-
-        if (s.Grade != 0)
-            Ui.Text($"grade {s.Grade * 100:F1} %", x0 + 16, r.Y + 16, 26, Color.Black);
     }
 
     private static void DrawInstruments(in Frame f, VehicleParams p, Rectangle r)
@@ -181,6 +115,4 @@ public static class Dashboard
         Gear.Reverse => "R",
         _ => ((int)g).ToString(),
     };
-
-    private static double Mod(double a, double m) => a - m * Math.Floor(a / m);
 }

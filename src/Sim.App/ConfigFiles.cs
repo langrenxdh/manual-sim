@@ -10,6 +10,7 @@ public sealed class ConfigFiles
     public const string InputFile = "g29.json";
     public const string SoundFile = "engine-sound.json";
     public const string SceneFile = "scene.json";
+    public const string CameraFile = "camera.json";
 
     public string Directory { get; }
 
