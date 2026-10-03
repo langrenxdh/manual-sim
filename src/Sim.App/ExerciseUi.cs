@@ -55,7 +55,8 @@ public sealed class ExerciseUi
     {
         if (!MenuOpen) return;
         int count = config.Exercises.Length + 1;
-        var r = new Rectangle(area.X + (area.Width - MenuWidth) / 2, area.Y + 40, MenuWidth, 90 + count * RowHeight + 40);
+        float mw = Math.Min(MenuWidth, area.Width - 16);
+        var r = new Rectangle(area.X + (area.Width - mw) / 2, area.Y + 40, mw, 90 + count * RowHeight + 40);
         DrawRectangleRounded(r, 0.04f, 6, Bg);
         Ui.Text("Exercises", r.X + 24, r.Y + 18, 32, Fg);
         Ui.Text("Up/Down (or D-pad) select, Enter (or D-pad right) start, Esc close", r.X + 24, r.Y + 58, 17, Muted);
@@ -85,7 +86,7 @@ public sealed class ExerciseUi
         string live = $"{m.ElapsedS:F1} s   clutch heat {m.ClutchSlipEnergyKJ:F1} kJ   jerk {m.PeakJerkMps3:F0}" +
                       (e.MaxRollbackM != null ? $"   rollback {m.RollbackM:F2} m" : "") +
                       (m.GrindingS > 0 ? $"   grinding {m.GrindingS:F1} s" : "");
-        float w = Math.Max(Ui.Width(e.Goal, 18), Ui.Width(live, 18)) + 40;
+        float w = Math.Min(Math.Max(Ui.Width(e.Goal, 18), Ui.Width(live, 18)) + 40, road.Width - 8);
         var r = new Rectangle(road.X + (road.Width - w) / 2, road.Y + 12, w, 92);
         DrawRectangleRounded(r, 0.15f, 6, Bg);
         Ui.Centred(e.Name, r.X + w / 2, r.Y + 8, 24, Fg);
@@ -98,7 +99,8 @@ public sealed class ExerciseUi
     {
         if (x.Exercise is not { } e || x.Result is not { } res) return;
         float h = 210 + res.Penalties.Count * 30 + 60;
-        var r = new Rectangle(area.X + (area.Width - CardWidth) / 2, area.Y + 30, CardWidth, h);
+        float cw = Math.Min(CardWidth, area.Width - 16);
+        var r = new Rectangle(area.X + (area.Width - cw) / 2, area.Y + 30, cw, h);
         DrawRectangleRounded(r, 0.04f, 6, Bg);
         float x0 = r.X + 28, y = r.Y + 18;
 
@@ -117,16 +119,16 @@ public sealed class ExerciseUi
         y += 34;
 
         Ui.Text("metric", x0, y, 16, Muted);
-        Ui.Text("value", x0 + 260, y, 16, Muted);
-        Ui.Text("points lost", x0 + 420, y, 16, Muted);
+        Ui.Text("value", x0 + cw * 0.42f, y, 16, Muted);
+        Ui.Text("points lost", x0 + cw * 0.68f, y, 16, Muted);
         y += 26;
         var biggest = res.Biggest;
         foreach (var p in res.Penalties)
         {
             Color c = p == biggest ? Warn : Fg;
             Ui.Text(Label(p.Metric), x0, y, 19, c);
-            Ui.Text(Value(p.Metric, p.Value), x0 + 260, y, 19, c);
-            Ui.Text($"{p.Points:F0} / {p.Weight:F0}", x0 + 420, y, 19, c);
+            Ui.Text(Value(p.Metric, p.Value), x0 + cw * 0.42f, y, 19, c);
+            Ui.Text($"{p.Points:F0} / {p.Weight:F0}", x0 + cw * 0.68f, y, 19, c);
             y += 30;
         }
 
@@ -138,8 +140,8 @@ public sealed class ExerciseUi
 
     private static string Label(Metric m) => m switch
     {
-        Metric.ClutchSlipEnergyKJ => "Clutch heat (slip energy)",
-        Metric.PeakJerkMps3 => "Lurch (peak jerk)",
+        Metric.ClutchSlipEnergyKJ => "Clutch heat",
+        Metric.PeakJerkMps3 => "Lurch",
         Metric.RollbackM => "Rollback",
         Metric.GrindingS => "Grinding",
         Metric.OverRevS => "Over-rev",

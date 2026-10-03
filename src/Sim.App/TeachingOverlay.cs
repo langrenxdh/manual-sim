@@ -13,6 +13,24 @@ namespace Sim.App;
 public static class TeachingOverlay
 {
     private const float Width = 260, Pad = 14, EdgeMargin = 16;
+
+    /// <summary>Horizontal space each side box takes from the road view (box plus both margins).</summary>
+    public const float SideReserve = Width + 2 * EdgeMargin;
+
+    /// <summary>Narrower than this between the boxes, they stack on the left instead.</summary>
+    private const float MinCentreWidth = 420;
+    private const float ClutchBoxHeight = 250, EngineBoxHeight = 194, StackGap = 12;
+
+    private static bool Stacked(Rectangle road) => road.Width - 2 * SideReserve < MinCentreWidth;
+
+    /// <summary>
+    /// The part of the road view clear of the side boxes, for other overlays. When the view is too
+    /// narrow the boxes stack on the left and the whole view is returned (other overlays may cover them).
+    /// </summary>
+    public static Rectangle Centre(Rectangle road) => Stacked(road)
+        ? road
+        : new(road.X + SideReserve, road.Y, road.Width - 2 * SideReserve, road.Height);
+
     private const int CurveSamples = 60;
 
     private static readonly Color Bg = new(10, 10, 14, 200);
@@ -27,8 +45,12 @@ public static class TeachingOverlay
 
     public static void Draw(in Frame f, VehicleParams p, Rectangle road)
     {
-        DrawClutch(f, p.Clutch, new Rectangle(road.X + EdgeMargin, road.Y + road.Height * 0.18f, Width, 250));
-        DrawEngine(f.State, p, new Rectangle(road.X + road.Width - Width - EdgeMargin, road.Y + road.Height * 0.18f, Width, 194));
+        float top = road.Y + road.Height * 0.18f;
+        DrawClutch(f, p.Clutch, new Rectangle(road.X + EdgeMargin, top, Width, ClutchBoxHeight));
+        var engine = Stacked(road)
+            ? new Rectangle(road.X + EdgeMargin, top + ClutchBoxHeight + StackGap, Width, EngineBoxHeight)
+            : new Rectangle(road.X + road.Width - Width - EdgeMargin, top, Width, EngineBoxHeight);
+        DrawEngine(f.State, p, engine);
     }
 
     private static void DrawClutch(in Frame f, ClutchParams c, Rectangle r)
