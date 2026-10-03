@@ -1,0 +1,98 @@
+// Illustrative mid-size car, 2.0 L turbo diesel, 6-speed manual (M7, docs/design.en.md).
+// Not a specific model: plausible figures for the class (net ~320 Nm @ 1750-3000 rpm, ~105 kW @ 4000 rpm,
+// ~1500 kg), chosen to feel clearly different from the Golf: heavy flywheel, strong pull once the turbo
+// spools, low redline. Torque curves are gross combustion torque (net + friction).
+{
+  "name": "2.0 turbo diesel (illustrative)",
+  "engine": {
+    "inertiaKgM2": 0.24,
+    "idleRpm": 800,
+    "stallRpm": 450,
+    "redlineRpm": 4500,
+    "fuelCutRpm": 5000,
+    "naTorqueNm": [
+      [500, 130], [1000, 180], [1500, 190], [2000, 190], [3000, 185], [4000, 170], [5000, 150]
+    ],
+    "boostTorqueNm": [
+      [1000, 60], [1500, 130], [2000, 160], [3000, 160], [3500, 138], [4000, 115], [5000, 60]
+    ],
+    "boostTarget": [[1100, 0], [1400, 0.4], [1750, 1], [5000, 1]],
+    "boostTimeConstantS": 0.8,
+    "frictionTorqueNm": [
+      [0, 110], [200, 20], [500, 20], [1000, 22], [1500, 24], [2000, 26], [3000, 30], [4000, 35], [5000, 40]
+    ],
+    "starterStallTorqueNm": 170,
+    "starterFreeRpm": 600
+  },
+  "idleControl": {
+    "proportionalGainNmPerRpm": 0.8,
+    "integralGainNmPerRpmS": 3,
+    "maxTorqueNm": 150
+  },
+  "clutch": {
+    "maxTorqueNm": 480,
+    "bitePoint": 0.8,
+    "biteZoneWidth": 0.7,
+    "engagementExponent": 2,
+    "shiftMaxEngagement": 0.05
+  },
+  "gearbox": {
+    "forwardRatios": [3.62, 1.95, 1.28, 0.88, 0.7, 0.57],
+    "reverseRatio": 3.4,
+    "finalDriveRatio": 3.45,
+    "efficiency": 0.92,
+    "inputShaftInertiaKgM2": 0.025,
+    "inputShaftDragNm": 1.2
+  },
+  "chassis": {
+    "massKg": 1580,
+    "tyreCircumferenceM": 2.05,
+    "rollingResistanceCoeff": 0.012,
+    "dragAreaM2": 0.68,
+    "maxBrakeForceN": 15000,
+    "handbrakeForceN": 4500
+  },
+  "environment": {
+    "gravityMps2": 9.81,
+    "airDensityKgM3": 1.2,
+    "ambientTempC": 25
+  },
+  "hillHold": {
+    "enabled": true,
+    "minGrade": 0.03,
+    "brakePedalThreshold": 0.1,
+    "standstillSpeedMps": 0.05,
+    "holdTimeS": 2.0,
+    "holdForceN": 6000,
+    "releaseRateNPerS": 15000,
+    "driveAwayForceRatio": 1.0
+  },
+  "shudder": {
+    "maxAmplitudeRatio": 0.35,
+    "fadeOutRpm": 1300,
+    "irregularity": 0.3,
+    "seed": 20170901
+  },
+  "clutchThermal": {
+    "heatCapacityJPerK": 3500,
+    "coolingWPerK": 16,
+    "fadeStartC": 250,
+    "fadeEndC": 350,
+    "minFrictionFactor": 0.6,
+    "smellAboveC": 220
+  },
+  "engineThermal": {
+    "heatCapacityJPerK": 45000,
+    "heatPerMechanicalW": 1.6,
+    "coolingWPerK": 22,
+    "warmC": 90,
+    "thermostatWPerK": 2000,
+    "coldReferenceC": 0,
+    "coldFrictionExtra": 0.6,
+    "coldIdleExtraRpm": 200
+  },
+  "airCon": {
+    "loadNm": 9,
+    "idleBumpRpm": 50
+  }
+}

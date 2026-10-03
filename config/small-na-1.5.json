@@ -1,0 +1,97 @@
+// Illustrative small hatchback, 1.5 L naturally aspirated petrol, 6-speed manual (M7, docs/design.en.md).
+// Not a specific model: plausible figures for the class (net ~140 Nm @ 4000 rpm, ~80 kW @ 6000 rpm, ~1100 kg),
+// chosen to feel clearly different from the Golf: light, revvy, weak at low rpm with no turbo.
+// Torque curves are gross combustion torque (net + friction), as in golf-110tsi.json.
+{
+  "name": "Small 1.5 NA petrol (illustrative)",
+  "engine": {
+    "inertiaKgM2": 0.11,
+    "idleRpm": 750,
+    "stallRpm": 380,
+    "redlineRpm": 6500,
+    "fuelCutRpm": 7000,
+    "naTorqueNm": [
+      [500, 71], [1000, 107], [2000, 130], [3000, 146], [4000, 161], [5000, 163], [6000, 158], [7000, 146]
+    ],
+    "boostTorqueNm": [[1000, 0], [7000, 0]],
+    "boostTarget": [[1000, 0], [7000, 0]],
+    "boostTimeConstantS": 0.5,
+    "frictionTorqueNm": [
+      [0, 60], [200, 11], [500, 11], [1000, 12], [1500, 13], [2000, 15], [3000, 18], [4000, 21], [5000, 25],
+      [6000, 30], [7000, 36]
+    ],
+    "starterStallTorqueNm": 100,
+    "starterFreeRpm": 700
+  },
+  "idleControl": {
+    "proportionalGainNmPerRpm": 0.5,
+    "integralGainNmPerRpmS": 2,
+    "maxTorqueNm": 100
+  },
+  "clutch": {
+    "maxTorqueNm": 230,
+    "bitePoint": 0.75,
+    "biteZoneWidth": 0.6,
+    "engagementExponent": 2,
+    "shiftMaxEngagement": 0.05
+  },
+  "gearbox": {
+    "forwardRatios": [3.58, 2.05, 1.39, 1.03, 0.84, 0.7],
+    "reverseRatio": 3.6,
+    "finalDriveRatio": 4.06,
+    "efficiency": 0.93,
+    "inputShaftInertiaKgM2": 0.015,
+    "inputShaftDragNm": 0.8
+  },
+  "chassis": {
+    "massKg": 1180,
+    "tyreCircumferenceM": 1.93,
+    "rollingResistanceCoeff": 0.012,
+    "dragAreaM2": 0.62,
+    "maxBrakeForceN": 11500,
+    "handbrakeForceN": 3500
+  },
+  "environment": {
+    "gravityMps2": 9.81,
+    "airDensityKgM3": 1.2,
+    "ambientTempC": 25
+  },
+  "hillHold": {
+    "enabled": false,
+    "minGrade": 0.03,
+    "brakePedalThreshold": 0.1,
+    "standstillSpeedMps": 0.05,
+    "holdTimeS": 2.0,
+    "holdForceN": 4500,
+    "releaseRateNPerS": 15000,
+    "driveAwayForceRatio": 1.0
+  },
+  "shudder": {
+    "maxAmplitudeRatio": 0.3,
+    "fadeOutRpm": 1300,
+    "irregularity": 0.3,
+    "seed": 20150601
+  },
+  "clutchThermal": {
+    "heatCapacityJPerK": 2500,
+    "coolingWPerK": 13,
+    "fadeStartC": 250,
+    "fadeEndC": 350,
+    "minFrictionFactor": 0.6,
+    "smellAboveC": 220
+  },
+  "engineThermal": {
+    "heatCapacityJPerK": 28000,
+    "heatPerMechanicalW": 1.9,
+    "coolingWPerK": 18,
+    "warmC": 90,
+    "thermostatWPerK": 2000,
+    "coldReferenceC": 0,
+    "coldFrictionExtra": 0.5,
+    "coldIdleExtraRpm": 350
+  },
+  "airCon": {
+    "loadNm": 8,
+    "idleBumpRpm": 75
+  }
+}
