@@ -18,6 +18,8 @@ public sealed class ConfigFiles
     public const string CarsFile = "cars.json";
     public const string CuesFile = "cues.json";
     public const string TownFile = "town.json";
+    public const string UiFile = "ui.json";
+    public const string ChineseStringsFile = "strings.zh.json";
 
     public string Directory { get; }
 

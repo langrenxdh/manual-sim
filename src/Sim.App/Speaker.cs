@@ -28,11 +28,21 @@ public sealed class Speaker : IDisposable
         }
     }
 
+    /// <summary>Speaks the text in the UI language; a Chinese voice is used when one is installed.</summary>
     public void Say(string text)
     {
         if (_synth == null) return;
         _synth.SpeakAsyncCancelAll();
-        _synth.SpeakAsync(text);
+        try
+        {
+            var culture = new System.Globalization.CultureInfo(Tr.Chinese ? "zh-CN" : "en-US");
+            if (_synth.GetInstalledVoices(culture).FirstOrDefault(v => v.Enabled) is { } voice)
+                _synth.SelectVoice(voice.VoiceInfo.Name);
+        }
+        catch (Exception) // no voice for the language: keep the current one
+        {
+        }
+        _synth.SpeakAsync(Tr.T(text));
     }
 
     public void Dispose() => _synth?.Dispose();

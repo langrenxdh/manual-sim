@@ -8,10 +8,10 @@ using static Raylib_cs.Raylib;
 // Manual transmission practice simulator (docs/design.en.md).
 // Keys: Tab tuning panel, E exercises, R restart (the road start, or the current exercise),
 // H restart on the hill or the current exercise (also the right paddle), M hill road / town map (steering),
-// P replay of the last 10 s
+// L Chinese / English, P replay of the last 10 s
 // (also triangle), T teaching mode (also O), V car, C air-con, F2 first-time setup, F11 borderless fullscreen,
 // E also lists the exams (Enter between exam parts), Esc leaves an exercise or exam, otherwise quits.
-// --screenshot FILE [--panel] [--hill] [--replay] [--teaching] [--setup] [--menu] [--progress] [--town] [--exercise ID] [--frames N] [--size WxH]:
+// --screenshot FILE [--panel] [--hill] [--replay] [--teaching] [--setup] [--menu] [--progress] [--town] [--language zh|en] [--exercise ID] [--frames N] [--size WxH]:
 // save a frame after start-up and exit (checks the visuals without a person). --hill and
 // --exercise ID also work on their own.
 string? screenshotPath = args.Length >= 2 && args[0] == "--screenshot" ? Path.GetFullPath(args[1]) : null;
@@ -31,6 +31,20 @@ var camera = CameraParams.FromJson(config.Read(ConfigFiles.CameraFile));
 var ffbParams = FfbParams.FromJson(config.Read(ConfigFiles.FfbFile));
 var exercises = ExerciseConfig.FromJson(config.Read(ConfigFiles.ExercisesFile));
 var town = TownMap.FromJson(config.Read(ConfigFiles.TownFile));
+// UI language (M10): English text everywhere, translated on drawing when Chinese is on.
+if (config.Exists(ConfigFiles.ChineseStringsFile)) Tr.LoadTable(config.Read(ConfigFiles.ChineseStringsFile));
+if (config.Exists(ConfigFiles.UiFile))
+    Tr.SetLanguage(System.Text.Json.JsonDocument.Parse(config.Read(ConfigFiles.UiFile),
+        new System.Text.Json.JsonDocumentOptions { CommentHandling = System.Text.Json.JsonCommentHandling.Skip })
+        .RootElement.GetProperty("language").GetString() ?? "en");
+if (args.SkipWhile(a => a != "--language").Skip(1).FirstOrDefault() is { } language) Tr.SetLanguage(language);
+
+void ToggleLanguage()
+{
+    Tr.SetLanguage(Tr.Chinese ? "en" : "zh");
+    Ui.Reload();
+    if (screenshotPath == null) config.Save(ConfigFiles.UiFile, $"{{\n  \"language\": \"{Tr.Language}\"\n}}");
+}
 // Driving data lives next to config/; unattended screenshot runs use a throwaway folder so they can
 // never mix with (or tempt anyone to delete) the real telemetry and score history.
 string dataRoot = screenshotPath != null
@@ -297,6 +311,7 @@ while (!WindowShouldClose())
         if (IsKeyPressed(KeyboardKey.T)) ToggleTeaching();
         if (IsKeyPressed(KeyboardKey.V)) carMenu.Open = true;
         if (IsKeyPressed(KeyboardKey.M) && examRun == null) ToggleTown();
+        if (IsKeyPressed(KeyboardKey.L)) ToggleLanguage();
         if (IsKeyPressed(KeyboardKey.C)) physics.AirConOn = !physics.AirConOn;
         if (IsKeyPressed(KeyboardKey.F2)) setupScreen.Open(setup);
         if (buttons.HillStart && !previousButtons.HillStart) RestartOrRetry(hill: true);
@@ -392,7 +407,7 @@ while (!WindowShouldClose())
     Dashboard.Draw(frame, vehicle, scene.Dashboard, new Rectangle(viewArea.X, viewArea.Y + roadHeight, viewArea.Width, viewArea.Height - roadHeight));
     if (!panel.Visible)
         Ui.Text($"physics {frame.PhysicsHz:F0} Hz  overruns {frame.Overruns}   Tab: tuning panel   " +
-                $"M: {(onTown ? "hill road" : "town map")}", 8, h - 24, 18, Color.Gray);
+                $"M: {(onTown ? "hill road" : "town map")}   L: Chinese", 8, h - 24, 18, Color.Gray);
     panel.Draw(panelArea, frame, vehicle);
     setupScreen.Draw(new Rectangle(0, 0, w, h));
 
