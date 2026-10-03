@@ -39,6 +39,8 @@ public sealed class ExerciseSession
     private double _filteredAccel, _previousFiltered, _finishHeld;
     private bool _primed, _wasFiring;
     private int _stalls;
+    private readonly List<TraceSample> _trace;
+    private double _sinceSample = double.MaxValue;
 
     public ExerciseDef Exercise { get; }
     public AttemptPhase Phase { get; private set; } = AttemptPhase.Running;
@@ -53,6 +55,8 @@ public sealed class ExerciseSession
         Exercise = exercise;
         _engineStallRpm = vehicle.Engine.StallRpm;
         _redlineRpm = vehicle.Engine.RedlineRpm;
+        // Sized for the whole time limit up front, so the physics thread never reallocates mid-attempt.
+        _trace = new List<TraceSample>((int)Math.Ceiling(exercise.TimeLimitS / Trace.IntervalS) + 2);
     }
 
     /// <summary>
@@ -65,10 +69,19 @@ public sealed class ExerciseSession
     public AttemptMetrics Metrics => new(_elapsed, _distance, _slipEnergyJ / 1000, _peakJerk, _rollback, _grinding,
         _overRev, _stalls);
 
-    /// <summary>Feed one physics step (after <see cref="Simulator.Step"/>).</summary>
-    public void Observe(in SimState s, double dtS)
+    /// <summary>Feed one physics step (after <see cref="Simulator.Step"/>) with the input that drove it.</summary>
+    public void Observe(in SimState s, in DriverInput input, double dtS)
     {
         if (Phase != AttemptPhase.Running) return;
+
+        // Trace for the ghost comparison, sampled from the attempt start.
+        _sinceSample += dtS;
+        if (_sinceSample >= Trace.IntervalS - 1e-9)
+        {
+            _sinceSample = 0;
+            _trace.Add(new TraceSample((float)_elapsed, (float)input.Clutch, (float)input.Throttle, (float)input.Brake,
+                (float)s.EngineRpm, (float)s.SpeedKmh));
+        }
 
         if (!_primed)
         {
@@ -115,6 +128,6 @@ public sealed class ExerciseSession
     {
         Phase = phase;
         FailReason = reason;
-        Result = Scorer.Score(_config, Exercise, Metrics, failed: phase == AttemptPhase.Failed, reason);
+        Result = Scorer.Score(_config, Exercise, Metrics, failed: phase == AttemptPhase.Failed, reason, _trace.ToArray());
     }
 }

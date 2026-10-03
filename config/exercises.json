@@ -3,10 +3,12 @@
 // above "bad", linear in between; weights add up to 100. A stall, too much rollback or the time
 // limit fails the attempt (0 points). Calibrated against scripted driving in tests/Sim.Training.Tests
 // (jerk filtered at 3 Hz: smooth 2 s pull-away ~26 m/s^3, 80 % throttle flare ~87); tune by feel,
-// but keep those tests' intent.
+// but keep those tests' intent. "coaching" sets the ghost comparison (a pedal differs from the best attempt by
+// more than divergencePedalGap of its travel for divergenceHoldS) and the progress view windows.
 {
   "jerkFilterHz": 3,
   "grades": { "a": 90, "b": 75, "c": 50 },
+  "coaching": { "divergencePedalGap": 0.15, "divergenceHoldS": 0.2, "recentAttempts": 5, "trendAttempts": 10 },
   "exercises": [
     {
       "id": "flatPullAway",

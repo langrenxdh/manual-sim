@@ -130,7 +130,7 @@ public sealed class PhysicsLoop : IDisposable
                     var sample = reader?.Poll(Simulator.StepS)
                         ?? new InputSample(new DriverInput(0, 0, 0, Gear.Neutral), false, 0, 0, 0, false);
                     sim.Step(sample.Input);
-                    _session?.Observe(sim.State, Simulator.StepS);
+                    _session?.Observe(sim.State, sample.Input, Simulator.StepS);
                     stepsDone++;
                     stepsInWindow++;
 

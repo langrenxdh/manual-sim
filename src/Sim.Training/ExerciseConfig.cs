@@ -33,6 +33,7 @@ public sealed record ExerciseConfig
     /// <summary>Low-pass applied to longitudinal acceleration before taking its rate of change.</summary>
     public required double JerkFilterHz { get; init; }
     public required GradeThresholds Grades { get; init; }
+    public required CoachingParams Coaching { get; init; }
     public required ExerciseDef[] Exercises { get; init; }
 
     /// <summary>The vehicle file's conventions, plus enums written as camelCase strings.</summary>
@@ -54,6 +55,7 @@ public sealed record ExerciseConfig
         Require(JerkFilterHz > 0, "jerkFilterHz must be > 0");
         Require(Grades.A > Grades.B && Grades.B > Grades.C && Grades.C > 0 && Grades.A <= 100,
             "grades must satisfy 100 >= a > b > c > 0");
+        Coaching.Validate();
         Require(Exercises.Length > 0, "at least one exercise is required");
         Require(Exercises.Select(e => e.Id).Distinct().Count() == Exercises.Length, "exercise ids must be unique");
         foreach (var e in Exercises) e.Validate();

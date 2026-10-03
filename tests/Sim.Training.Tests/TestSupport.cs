@@ -28,8 +28,9 @@ internal static class Attempt
         int steps = (int)(maxSeconds / Simulator.StepS);
         for (int i = 0; i < steps && session.Phase == AttemptPhase.Running; i++)
         {
-            sim.Step(driver(i * Simulator.StepS));
-            session.Observe(sim.State, Simulator.StepS);
+            var input = driver(i * Simulator.StepS);
+            sim.Step(input);
+            session.Observe(sim.State, input, Simulator.StepS);
         }
         return session;
     }
