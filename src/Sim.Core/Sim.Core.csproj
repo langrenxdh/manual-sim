@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Physics core: no package references, nothing OS-specific (see docs/engineering-rules.en.md hard rule 1). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Sim.Core</RootNamespace>
+  </PropertyGroup>
+
+</Project>
