@@ -80,6 +80,8 @@ v1 (M0–M3) is complete, and M4 (graded exercises and scoring) is built. This d
 
 ### M8 — Coaching II: exam mode and audio cues (ideas 7, 8)
 
+**Status: implemented (2026-10-03), see the M8 decision record in the design doc; hand check pending.**
+
 - **Exam mode (7):** a fixed sequence (for example: pull-away, chained hill sequence, queue, downshift, reverse uphill), each part scored; overall pass if every part completes and the total reaches a threshold. Results in the history. Pure logic in `Sim.Training` with tests.
 - **Audio cues (8):** in teaching mode only, short spoken or tone cues triggered by state: approaching the bite point, idle control nearly exhausted ("more throttle"), rollback starting. Uses pre-recorded or synthesised clips through raylib audio; the rules are thresholds in a config file.
 - **Gate:** the exam feels like a fair test; the cues help without nagging.

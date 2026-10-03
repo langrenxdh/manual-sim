@@ -404,3 +404,16 @@ The milestones after M4 (M5–M10: coaching, more exercises, fidelity and other 
 | K7 | T11: every car must idle steadily, pull away on a 2.5 s release without stalling, and really differ. The first diesel draft stalled on a gentle pull-away for lack of torque off boost; low-rpm torque moved from the boost part to the naturally aspirated part, boosted totals unchanged | The test caught implausible parameters; the parameters changed, not the test |
 | K8 | The instrument strip gains CLUTCH (smell, amber), COLD (more than 5 °C below operating temperature, blue) and A/C lights; the panel shows temperatures, clutch friction factor and idle target; telemetry gains four fields | Glass box: whatever the model knows can be seen |
 | K9 | The M4 and M6 scoring needs no recalibration: warm engine and air-con off by default, and normal practice warms the clutch very little, so S1–S10 all still pass | The new effects only matter when abusing the clutch or starting cold |
+
+## M8 decision record (exam mode and audio cues)
+
+2026-10-03, implemented locally. The gate "the exam feels like a fair test; the cues help without nagging" is pending my check on the G29.
+
+| # | Decision | Reason |
+| --- | --- | --- |
+| L1 | Exams are defined in the `exams` section of `exercises.json`: an ordered list of exercises; passed when every part completes and the average reaches the pass mark; a failed part counts as 0. A five-part "Driving test" ships (flat pull-away, stop-line hill start, queue, rev-matched downshift, reverse uphill), pass mark 70 | Like a real test: one go, no retries |
+| L2 | During an exam R / H / the right paddle do nothing (no retries); after each part Enter starts the next, and after the last a summary card appears; the exam's result is recorded as `exam:<id>` in the score history and its best shows in the menu | Exams reuse the exercise sessions, scoring and history |
+| L3 | Cue rules live in `config/cues.json`: a cue fires when its condition becomes true (an edge), with a cooldown per cue; it is spoken only in teaching mode (Windows speech synthesis, `System.Speech`) and shown at the bottom of the road view for 2.5 s. The rules are in the tuning panel too | Helpful without nagging; when speech is unavailable the text is still shown |
+| L4 | "More throttle" uses the stall margin (< 50 rpm above stalling), not idle-control usage | Measured: in the model the idle controller saturates at 100 % even in a gentle 3 s release, so usage cannot tell good from bad; the lowest rpm can: 2 s 463, 1.5 s 406 (6 rpm above stalling), faster stalls |
+| L5 | The other cues: bite point (in gear, nearly stopped, engagement above 0.05), rolling back (against the gear's direction faster than 0.1 m/s), over-rev, clutch hot | All are conditions on the physics state; the rules only decide when to speak |
+| L6 | Tests: 4 for exam verdicts; 3 for cues (a gentle pull-away says only "bite point", once; a clutch dump asks for throttle; releasing the handbrake on the hill without throttle says "rolling back") | As with scoring, scripted driving pins the intent |
