@@ -5,6 +5,7 @@
   "clutch": { "axis": 3, "inverted": true, "deadZoneReleased": 0.02, "deadZonePressed": 0.02, "lowPassCutoffHz": 20 },
   "throttle": { "axis": 1, "inverted": true, "deadZoneReleased": 0.02, "deadZonePressed": 0.02, "lowPassCutoffHz": 20 },
   "brake": { "axis": 2, "inverted": true, "deadZoneReleased": 0.02, "deadZonePressed": 0.02, "lowPassCutoffHz": 20 },
+  "steering": { "axis": 0, "inverted": true, "rangeDeg": 900 },
   "forwardGearButtons": [12, 13, 14, 15, 16, 17],
   "reverseGearButton": 18,
   "starterButton": 0,

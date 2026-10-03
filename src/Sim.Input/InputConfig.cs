@@ -14,6 +14,8 @@ public sealed record InputConfig
     public required PedalConfig Clutch { get; init; }
     public required PedalConfig Throttle { get; init; }
     public required PedalConfig Brake { get; init; }
+    /// <summary>Steering wheel (M9): axis, direction (left must come out positive) and lock-to-lock range.</summary>
+    public required SteeringAxisConfig Steering { get; init; }
     /// <summary>Button numbers of gears 1 to 6 on the H-shifter.</summary>
     public required int[] ForwardGearButtons { get; init; }
     public required int ReverseGearButton { get; init; }
@@ -55,6 +57,7 @@ public sealed record InputConfig
         Clutch.Validate("clutch");
         Throttle.Validate("throttle");
         Brake.Validate("brake");
+        Require(Steering.Axis >= 0 && Steering.RangeDeg > 0, "steering.axis must be >= 0 and steering.rangeDeg > 0");
         Require(ForwardGearButtons.Length == 6, "forwardGearButtons must list 6 gears");
         Require(ForwardGearButtons.Append(ReverseGearButton).Append(StarterButton).Append(HandbrakeButton)
             .Append(TeachingModeButton).Append(ReplayButton).Append(HillStartButton)
@@ -87,4 +90,13 @@ public sealed record PedalConfig
             $"{name} dead zones must be >= 0 and leave some travel");
         InputConfig.Require(LowPassCutoffHz > 0, $"{name}.lowPassCutoffHz must be > 0");
     }
+}
+
+public sealed record SteeringAxisConfig
+{
+    public required int Axis { get; init; }
+    /// <summary>True when the raw axis value decreases as the wheel turns left.</summary>
+    public required bool Inverted { get; init; }
+    /// <summary>Wheel rotation from full left lock to full right lock (G HUB "operating range").</summary>
+    public required double RangeDeg { get; init; }
 }

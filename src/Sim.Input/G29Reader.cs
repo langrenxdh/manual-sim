@@ -79,7 +79,9 @@ public sealed unsafe class G29Reader : IDisposable
         if (handbrakeDown && !_handbrakeButtonWasDown) _handbrakeOn = !_handbrakeOn;
         _handbrakeButtonWasDown = handbrakeDown;
 
-        var input = new DriverInput(clutch, throttle, brake, Lever(c), _handbrakeOn, Button(c.StarterButton));
+        double steer = SDL_GetJoystickAxis(_joystick, c.Steering.Axis) / 32768.0 * (c.Steering.Inverted ? -1 : 1);
+        var input = new DriverInput(clutch, throttle, brake, Lever(c), _handbrakeOn, Button(c.StarterButton),
+            SteeringWheelDeg: steer * c.Steering.RangeDeg / 2);
         return new InputSample(input, true, _clutch.Normalised, _throttle.Normalised, _brake.Normalised,
             _clutchReported && _throttleReported && _brakeReported,
             new UiButtons(Button(c.TeachingModeButton), Button(c.ReplayButton), Button(c.HillStartButton),
