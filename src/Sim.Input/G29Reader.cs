@@ -10,7 +10,8 @@ public readonly record struct InputSample(
     bool Connected,
     double ClutchNormalised,
     double ThrottleNormalised,
-    double BrakeNormalised);
+    double BrakeNormalised,
+    bool PedalsReported);
 
 /// <summary>
 /// Reads the G29 through SDL3 (joystick subsystem only, no window). Create, poll and dispose it on
@@ -25,6 +26,10 @@ public sealed unsafe class G29Reader : IDisposable
     private readonly PedalChannel _clutch = new();
     private readonly PedalChannel _throttle = new();
     private readonly PedalChannel _brake = new();
+    // Until the G29 sends its first report SDL returns 0 (mid travel) for every axis, and
+    // SDL_GetJoystickAxisInitialState claims 0 is known (seen in M2). A pedal is therefore treated as
+    // released until it reads anything other than 0.
+    private bool _clutchReported, _throttleReported, _brakeReported;
 
     /// <summary>Mapping and filter settings. May be replaced between polls (tuning panel).</summary>
     public InputConfig Config { get; set; }
@@ -57,20 +62,21 @@ public sealed unsafe class G29Reader : IDisposable
                 TryOpen();
             }
             if (_joystick == null)
-                return new InputSample(new DriverInput(0, 0, 0, Gear.Neutral), false, 0, 0, 0);
+                return new InputSample(new DriverInput(0, 0, 0, Gear.Neutral), false, 0, 0, 0, false);
         }
 
         var c = Config;
-        double clutch = _clutch.Update(c.Clutch, SDL_GetJoystickAxis(_joystick, c.Clutch.Axis), dtS);
-        double throttle = _throttle.Update(c.Throttle, SDL_GetJoystickAxis(_joystick, c.Throttle.Axis), dtS);
-        double brake = _brake.Update(c.Brake, SDL_GetJoystickAxis(_joystick, c.Brake.Axis), dtS);
+        double clutch = _clutch.Update(c.Clutch, Axis(c.Clutch, ref _clutchReported), dtS);
+        double throttle = _throttle.Update(c.Throttle, Axis(c.Throttle, ref _throttleReported), dtS);
+        double brake = _brake.Update(c.Brake, Axis(c.Brake, ref _brakeReported), dtS);
 
         bool handbrakeDown = Button(c.HandbrakeButton);
         if (handbrakeDown && !_handbrakeButtonWasDown) _handbrakeOn = !_handbrakeOn;
         _handbrakeButtonWasDown = handbrakeDown;
 
         var input = new DriverInput(clutch, throttle, brake, Lever(c), _handbrakeOn, Button(c.StarterButton));
-        return new InputSample(input, true, _clutch.Normalised, _throttle.Normalised, _brake.Normalised);
+        return new InputSample(input, true, _clutch.Normalised, _throttle.Normalised, _brake.Normalised,
+            _clutchReported && _throttleReported && _brakeReported);
     }
 
     private Gear Lever(InputConfig c)
@@ -80,6 +86,13 @@ public sealed unsafe class G29Reader : IDisposable
             if (Button(c.ForwardGearButtons[g])) return (Gear)(g + 1);
         }
         return Button(c.ReverseGearButton) ? Gear.Reverse : Gear.Neutral;
+    }
+
+    private short Axis(PedalConfig pc, ref bool reported)
+    {
+        short raw = SDL_GetJoystickAxis(_joystick, pc.Axis);
+        if (!reported && raw != 0) reported = true;
+        return reported ? raw : pc.Inverted ? short.MaxValue : short.MinValue;
     }
 
     private bool Button(int index) => SDL_GetJoystickButton(_joystick, index);
@@ -99,6 +112,7 @@ public sealed unsafe class G29Reader : IDisposable
             _clutch.Reset();
             _throttle.Reset();
             _brake.Reset();
+            _clutchReported = _throttleReported = _brakeReported = false;
             return;
         }
     }
