@@ -39,11 +39,25 @@ public sealed class Simulator
     private double _engineTempC;  // M7: lumped engine temperature
     private bool _airCon;
     private double _idleTargetRpm;
+    // M9 lateral state (only moves when _steering)
+    private readonly bool _steering;
+    private double _worldX, _worldY, _heading, _yawRate, _lateralAccel, _roadWheelDeg, _aligningTorqueNm;
+    private bool _frontSliding;
 
     /// <param name="engineTempC">Engine temperature at start; null = warm (operating temperature).</param>
+    /// <param name="steering">
+    /// M9: when true the steering-wheel input turns the car on a flat 2D plane (pose X, Y, heading); when
+    /// false the car runs straight along the road, exactly as before steering existed.
+    /// </param>
+    /// <param name="headingRad">Initial heading for steering (0 = along +X).</param>
     public Simulator(VehicleParams parameters, Road road, Gear gear = Gear.Neutral,
-        double speedMps = 0, double? engineRpm = null, double positionM = 0, double? engineTempC = null)
+        double speedMps = 0, double? engineRpm = null, double positionM = 0, double? engineTempC = null,
+        bool steering = false, double startX = 0, double startY = 0, double headingRad = 0)
     {
+        _steering = steering;
+        _worldX = steering ? startX : positionM;
+        _worldY = steering ? startY : 0;
+        _heading = steering ? headingRad : 0;
         parameters.Validate();
         _p = parameters;
         _road = road;
@@ -174,6 +188,8 @@ public sealed class Simulator
 
         UpdateTemperatures(p, clutchTorque, combustion, dt);
         _x += _v * dt;
+        if (_steering) UpdateLateral(p, input.SteeringWheelDeg, dt);
+        else _worldX = _x;
         _steps++;
 
         double idleUsage = ic.MaxTorqueNm > 0 ? idleTorque / ic.MaxTorqueNm : 1;
@@ -217,6 +233,35 @@ public sealed class Simulator
         double heatW = e.HeatPerMechanicalW * Math.Max(0, combustionTorque * _we);
         double coolW = e.CoolingWPerK * (_engineTempC - ambient) + e.ThermostatWPerK * Math.Max(0, _engineTempC - e.WarmC);
         _engineTempC += (heatW - coolW) / e.HeatCapacityJPerK * dt;
+    }
+
+    /// <summary>
+    /// Kinematic single-track step (M9b). The road-wheel angle sets the path curvature; lateral
+    /// acceleration is capped by tyre grip (understeer beyond it). The front lateral force times the
+    /// trail gives the aligning torque; the pneumatic trail fades as the front tyres slide.
+    /// </summary>
+    private void UpdateLateral(VehicleParams p, double steeringWheelDeg, double dt)
+    {
+        var st = p.Steering;
+        double maxRoad = st.MaxRoadWheelAngleDeg;
+        _roadWheelDeg = Math.Clamp(steeringWheelDeg / st.SteeringRatio, -maxRoad, maxRoad);
+        double curvature = Math.Tan(_roadWheelDeg * Math.PI / 180) / st.WheelbaseM;
+        double demand = _v * _v * curvature;                       // lateral acceleration the wheels ask for
+        double limit = st.TyreGripMu * p.Environment.GravityMps2;
+        _frontSliding = Math.Abs(demand) > limit;
+        _lateralAccel = _frontSliding ? Math.Sign(demand) * limit : demand;
+        _yawRate = _frontSliding ? _lateralAccel / _v : _v * curvature;
+
+        _heading += _yawRate * dt;
+        _worldX += _v * Math.Cos(_heading) * dt;
+        _worldY += _v * Math.Sin(_heading) * dt;
+
+        double frontShare = (st.WheelbaseM - st.CgToFrontAxleM) / st.WheelbaseM;
+        double frontLateralN = frontShare * p.Chassis.MassKg * _lateralAccel;
+        double excess = Math.Max(0, Math.Abs(demand) / limit - 1);
+        double trail = st.MechanicalTrailM + st.PneumaticTrailM * Math.Clamp(1 - excess / st.PneumaticTrailFadeRatio, 0, 1);
+        // Pushes the wheel back towards straight: opposite in sign to a forward turn.
+        _aligningTorqueNm = -st.PowerAssistFactor * frontLateralN * trail / st.SteeringRatio * Math.Sign(_v == 0 ? 1 : _v);
     }
 
     /// <summary>Gearbox input shaft rad/s per m/s of vehicle speed for a gear (negative in reverse).</summary>
@@ -384,6 +429,15 @@ public sealed class Simulator
             EngineTempC = _engineTempC,
             IdleTargetRpm = _idleTargetRpm,
             AirCon = _airCon,
+            Steering = _steering,
+            WorldX = _worldX,
+            WorldY = _worldY,
+            HeadingRad = _heading,
+            YawRateRadPerS = _yawRate,
+            LateralAccelMps2 = _lateralAccel,
+            RoadWheelAngleDeg = _roadWheelDeg,
+            FrontSliding = _frontSliding,
+            AligningTorqueNm = _aligningTorqueNm,
         };
     }
 }

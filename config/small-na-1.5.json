@@ -93,5 +93,16 @@
   "airCon": {
     "loadNm": 8,
     "idleBumpRpm": 75
+  },
+  "steering": {
+    "wheelbaseM": 2.52,
+    "cgToFrontAxleM": 0.98,
+    "steeringRatio": 14.5,
+    "maxRoadWheelAngleDeg": 35,
+    "tyreGripMu": 0.9,
+    "mechanicalTrailM": 0.02,
+    "pneumaticTrailM": 0.03,
+    "pneumaticTrailFadeRatio": 0.3,
+    "powerAssistFactor": 0.18
   }
 }

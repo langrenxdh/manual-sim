@@ -22,6 +22,7 @@ public sealed record VehicleParams
     public required ClutchThermalParams ClutchThermal { get; init; }
     public required EngineThermalParams EngineThermal { get; init; }
     public required AirConParams AirCon { get; init; }
+    public required SteeringParams Steering { get; init; }
 
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -78,6 +79,15 @@ public sealed record VehicleParams
         Require(et.WarmC > et.ColdReferenceC, "engineThermal.warmC must be above coldReferenceC");
         Require(et.ColdFrictionExtra >= 0 && et.ColdIdleExtraRpm >= 0, "engineThermal cold extras must be >= 0");
         Require(AirCon.LoadNm >= 0 && AirCon.IdleBumpRpm >= 0, "airCon values must be >= 0");
+        var st = Steering;
+        Positive(st.WheelbaseM, "steering.wheelbaseM");
+        Require(st.CgToFrontAxleM > 0 && st.CgToFrontAxleM < st.WheelbaseM, "steering.cgToFrontAxleM must lie within the wheelbase");
+        Positive(st.SteeringRatio, "steering.steeringRatio");
+        Require(st.MaxRoadWheelAngleDeg is > 0 and < 60, "steering.maxRoadWheelAngleDeg must be in (0, 60)");
+        Positive(st.TyreGripMu, "steering.tyreGripMu");
+        Require(st.MechanicalTrailM >= 0 && st.PneumaticTrailM >= 0, "steering trails must be >= 0");
+        Positive(st.PneumaticTrailFadeRatio, "steering.pneumaticTrailFadeRatio");
+        Require(st.PowerAssistFactor is > 0 and <= 1, "steering.powerAssistFactor must be in (0, 1]");
     }
 
     private static void Positive(double value, string name) => Require(value > 0, $"{name} must be > 0");
@@ -208,6 +218,33 @@ public sealed record EngineThermalParams
     public required double ColdFrictionExtra { get; init; }
     /// <summary>ECU idle target raise at full cold.</summary>
     public required double ColdIdleExtraRpm { get; init; }
+}
+
+/// <summary>
+/// Steering and lateral grip (M9b): a kinematic single-track ("bicycle") model with a grip limit.
+/// The path curvature follows the road-wheel angle until lateral acceleration reaches
+/// <see cref="TyreGripMu"/> x g, beyond which the car understeers. The self-aligning torque felt at the
+/// steering wheel is the front lateral force times the trail, through the ratio and the power assist;
+/// the pneumatic trail fades once the front tyres slide, so the wheel goes light.
+/// </summary>
+public sealed record SteeringParams
+{
+    public required double WheelbaseM { get; init; }
+    /// <summary>Centre of gravity to the front axle; sets the front axle's share of the weight.</summary>
+    public required double CgToFrontAxleM { get; init; }
+    /// <summary>Steering-wheel angle per road-wheel angle.</summary>
+    public required double SteeringRatio { get; init; }
+    public required double MaxRoadWheelAngleDeg { get; init; }
+    /// <summary>Lateral grip: the largest lateral acceleration is this times g.</summary>
+    public required double TyreGripMu { get; init; }
+    /// <summary>Caster trail: the geometric part of the aligning lever.</summary>
+    public required double MechanicalTrailM { get; init; }
+    /// <summary>Tyre (pneumatic) trail below the grip limit.</summary>
+    public required double PneumaticTrailM { get; init; }
+    /// <summary>The pneumatic trail is gone once the demanded lateral acceleration exceeds the limit by this fraction.</summary>
+    public required double PneumaticTrailFadeRatio { get; init; }
+    /// <summary>Share of the aligning torque the driver feels through the power steering.</summary>
+    public required double PowerAssistFactor { get; init; }
 }
 
 /// <summary>Air-conditioning compressor (M7): a load torque on the crank and an ECU idle raise while on.</summary>

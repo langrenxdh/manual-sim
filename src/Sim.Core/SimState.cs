@@ -65,4 +65,19 @@ public readonly record struct SimState
     /// <summary>Idle speed the ECU is aiming for right now (higher when cold or with the air-con on).</summary>
     public double IdleTargetRpm { get; init; }
     public bool AirCon { get; init; }
+
+    // Steering and pose (M9). Without steering: WorldX = PositionM, WorldY = 0, heading 0.
+    public bool Steering { get; init; }
+    public double WorldX { get; init; }
+    public double WorldY { get; init; }
+    /// <summary>Direction of travel, radians counter-clockwise from +X.</summary>
+    public double HeadingRad { get; init; }
+    public double YawRateRadPerS { get; init; }
+    /// <summary>Positive to the left.</summary>
+    public double LateralAccelMps2 { get; init; }
+    public double RoadWheelAngleDeg { get; init; }
+    /// <summary>The front tyres are past their grip limit (understeer).</summary>
+    public bool FrontSliding { get; init; }
+    /// <summary>Torque on the steering wheel from the tyres, Nm; positive turns the wheel to the left.</summary>
+    public double AligningTorqueNm { get; init; }
 }
