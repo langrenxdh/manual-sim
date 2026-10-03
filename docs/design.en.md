@@ -235,6 +235,8 @@ The first step is M0: one day to confirm that G29 input and force feedback both 
 
 M2 uses 2D instruments instead of a 3D scene so the feet can get on the pedals and start tuning as early as possible; visuals come once the feel is right. No stage has a date.
 
+The milestones after M4 (M5–M10: coaching, more exercises, fidelity and other cars, steering, sharing) and their order are in [`roadmap.en.md`](roadmap.en.md). When a milestone starts, its detailed design is written into this document.
+
 ## Open questions
 
 - [x] How to organise practice: both — free driving plus graded exercises, see "Practice and scoring" (M4).
