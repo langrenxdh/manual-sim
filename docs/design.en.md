@@ -336,3 +336,17 @@ The milestones after M4 (M5–M10: coaching, more exercises, fidelity and other 
 | G6 | In the upshift exercise the peak jerk comes from the launch, not the shifts: in the model, part-throttle upshifts with roughly matched revs barely jolt, so shift quality shows mainly in slip energy and grinding | Measured: upshifts released over 0.2–1 s all read the same jerk, set by the launch |
 | G7 | UI: E opens the exercise menu (keyboard or D-pad), R / H / right paddle retry, Esc returns to free driving; the result card shows each metric's penalty and "what to work on"; every result is appended to `scores/scores.jsonl` (not in git), and the best score counts completed attempts only | Usable from the wheel; the history lets progress be seen later |
 | G8 | The remaining open questions keep their current values by owner decision: redline 6000 rpm, US gear ratios, 205/55 R16, 8-bit pedals without upgrade | Owner decision |
+
+## M5 decision record (coaching I: ghost comparison and progress)
+
+2026-10-03, implemented locally. The gate "after a bad attempt the ghost clearly shows where I differed; the progress view matches my sense of how I am doing" is pending my check on the G29.
+
+| # | Decision | Reason |
+| --- | --- | --- |
+| H1 | The exercise session also receives the driver input and records a 100 Hz trace from the attempt start (clutch, throttle, brake, rpm, speed), preallocated for the time limit and handed over in the immutable result | No reallocation on the physics thread; 100 Hz shows pedal movement clearly and keeps files small |
+| H2 | Ghost = the trace of each exercise's best **completed** attempt, in `scores/ghosts/<exercise>.bin`; a new best replaces it | Comparing with my own best is the most convincing; failed attempts never become ghosts |
+| H3 | After an exercise, triangle (or P) replays the **whole attempt** with the ghost faintly behind it, aligned at the attempt start; in free driving it is still the last 10 s | Exercises have a clear start, so alignment is meaningful |
+| H4 | "First divergence": when the clutch or throttle stays more than 0.15 of its travel from the ghost for 0.2 s, that moment gets a yellow marker and one plain sentence ("you let the clutch out sooner than in your best", etc.). Thresholds in the `coaching` section of `exercises.json` | Pointing at the single earliest difference makes it easy to fix next time |
+| H5 | Progress: a new "Progress" entry in the exercise menu. Per exercise: attempts, completions, best, average of the last 5 (failures count as 0), least-squares trend over the last 10 (points per attempt), the most common issue, and a small chart of recent scores | Counting failures as 0 is honest; a trend says more about improvement than one score |
+| H6 | Every history line records the "main issue" (the failure reason, or the metric that cost the most points) | The progress view counts it |
+| H7 | `--screenshot` runs write telemetry and scores to a temp folder and never touch the repo's `telemetry/` or `scores/` | A test cleanup once deleted my real score history and telemetry; never again |

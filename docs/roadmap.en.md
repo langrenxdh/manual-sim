@@ -49,6 +49,8 @@ v1 (M0–M3) is complete, and M4 (graded exercises and scoring) is built. This d
 
 ### M5 — Coaching I: ghost comparison and progress (ideas 5, 6)
 
+**Status: implemented (2026-10-03), see the M5 decision record in the design doc; hand check pending.**
+
 - **Ghost:** for each exercise, the telemetry of the best completed attempt is saved (`scores/ghosts/<exercise>.bin`, same format as telemetry). The replay draws its pedal, rpm and speed traces faintly behind the current attempt, aligned at the attempt start. A new best replaces the ghost.
 - **Progress view:** a screen from the menu that plots each exercise's scores over time from `scores/scores.jsonl`, with the best and the trend, and the metric that most often costs points.
 - No physics change. Pure logic (alignment, trend, "most costly metric") goes into `Sim.Training` with tests.
