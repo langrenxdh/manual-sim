@@ -51,6 +51,16 @@ public static class TelemetryFields
         ("clutchFrictionFactor", f => (float)f.State.ClutchFrictionFactor),
         ("engineTempC", f => (float)f.State.EngineTempC),
         ("airCon", f => f.State.AirCon ? 1 : 0),
+        ("steeringWheelDeg", f => (float)f.Input.Input.SteeringWheelDeg),
+        ("steering", f => f.State.Steering ? 1 : 0),
+        ("worldX", f => (float)f.State.WorldX),
+        ("worldY", f => (float)f.State.WorldY),
+        ("headingRad", f => (float)f.State.HeadingRad),
+        ("yawRateRadPerS", f => (float)f.State.YawRateRadPerS),
+        ("lateralAccelMps2", f => (float)f.State.LateralAccelMps2),
+        ("roadWheelAngleDeg", f => (float)f.State.RoadWheelAngleDeg),
+        ("frontSliding", f => f.State.FrontSliding ? 1 : 0),
+        ("aligningTorqueNm", f => (float)f.State.AligningTorqueNm),
     ];
 
     public static int IndexOf(string name) => Array.FindIndex(All, f => f.Name == name);

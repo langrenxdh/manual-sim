@@ -111,7 +111,7 @@ public sealed class TuningPanel
     public static Rectangle ListArea(Rectangle area) =>
         new(area.X, area.Y + ReadoutHeight, area.Width, area.Height - ReadoutHeight - FooterHeight);
 
-    private const float ReadoutHeight = 13 * 23 + 16;
+    private const float ReadoutHeight = 14 * 23 + 16;
     private const float FooterHeight = 3 * 22 + 8;
 
     public void Draw(Rectangle area, in Frame f, VehicleParams p)
@@ -165,6 +165,10 @@ public sealed class TuningPanel
         Line($"shudder {s.ShudderIntensity:F2}   clutch {s.ClutchTempC:F0} C x{s.ClutchFrictionFactor:F2}   engine {s.EngineTempC:F0} C   idle target {s.IdleTargetRpm:F0}{(s.AirCon ? "   A/C" : "")}");
         Line($"speed {s.SpeedKmh:F1} km/h   accel {s.AccelerationMps2 / p.Environment.GravityMps2:F2} g   " +
              $"grade {s.Grade * 100:F1} %");
+        Line($"wheel {i.Input.SteeringWheelDeg:F0} deg" + (s.Steering
+            ? $"   road wheels {s.RoadWheelAngleDeg:F1} deg   lat {s.LateralAccelMps2 / p.Environment.GravityMps2:F2} g   " +
+              $"align {s.AligningTorqueNm:F1} Nm{(s.FrontSliding ? "   SLIDING" : "")}"
+            : "   (steering off on the hill road)"));
         Line($"hill hold {s.HillHold}   {s.HillHoldRemainingS:F1} s   {s.HillHoldForceN:F0} N");
         Line($"physics {f.PhysicsHz:F0} Hz   overruns {f.Overruns}   t {s.TimeS:F1} s");
         foreach (var extra in ExtraReadouts) Line(extra);

@@ -2,6 +2,7 @@
 // degrees counter-clockwise from east. Roads are built from pieces: { "straightM" } or { "turnDeg", "radiusM" }
 // (positive turn = left). The main road bends left into a roundabout; the east exit leads to a T-junction
 // with a north-south road ending in a car park; the north exit is a narrow dead end for three-point turns.
+// Starts sit in the left-hand lane (driving on the left).
 {
   "roads": [
     { "name": "main", "widthM": 7, "start": [0, 0], "startHeadingDeg": 0,
@@ -13,9 +14,9 @@
   "roundabout": { "center": [260, 216], "islandRadiusM": 8, "outerRadiusM": 16 },
   "carPark": { "corner": [396, 296], "size": [60, 36], "bayCount": 10, "bayWidthM": 2.6, "bayDepthM": 5 },
   "starts": [
-    { "id": "townStart", "x": 5, "y": 0, "headingDeg": 0 },
-    { "id": "roundaboutApproach", "x": 260, "y": 150, "headingDeg": 90 },
-    { "id": "carParkApproach", "x": 426, "y": 250, "headingDeg": 90 },
+    { "id": "townStart", "x": 5, "y": 1.75, "headingDeg": 0 },
+    { "id": "roundaboutApproach", "x": 258.25, "y": 150, "headingDeg": 90 },
+    { "id": "carParkApproach", "x": 424.25, "y": 250, "headingDeg": 90 },
     { "id": "deadEnd", "x": 260, "y": 285, "headingDeg": 90 }
   ]
 }

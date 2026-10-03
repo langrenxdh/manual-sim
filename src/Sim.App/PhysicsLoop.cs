@@ -54,7 +54,7 @@ public sealed class PhysicsLoop : IDisposable
     public bool AirConOn { get => _airConOn; set => _airConOn = value; }
 
     private sealed record ResetRequest(Road Road, double PositionM, bool EngageHandbrake,
-        ExerciseConfig? Exercises, ExerciseDef? Exercise, Scene? Scene, double? EngineTempC);
+        ExerciseConfig? Exercises, ExerciseDef? Exercise, Scene? Scene, double? EngineTempC, StartPose? Pose);
 
     // Physics-thread state for graded exercises (null in free driving).
     private ExerciseConfig? _exercises;
@@ -86,8 +86,8 @@ public sealed class PhysicsLoop : IDisposable
     /// Restarts the car at rest, in neutral, at idle, at a position on a road. On a hill the handbrake
     /// is usually engaged so the car does not roll back before the driver reacts.
     /// </summary>
-    public void Reset(Road road, double positionM, bool engageHandbrake, double? engineTempC = null) =>
-        Volatile.Write(ref _pendingReset, new ResetRequest(road, positionM, engageHandbrake, null, null, null, engineTempC));
+    public void Reset(Road road, double positionM, bool engageHandbrake, double? engineTempC = null, StartPose? pose = null) =>
+        Volatile.Write(ref _pendingReset, new ResetRequest(road, positionM, engageHandbrake, null, null, null, engineTempC, pose));
 
     /// <summary>
     /// Restarts the car for a new attempt at an exercise. The physics runs with the exercise's
@@ -95,8 +95,8 @@ public sealed class PhysicsLoop : IDisposable
     /// with the next plain <see cref="Reset"/>.
     /// </summary>
     public void StartExercise(Scene scene, double positionM, bool engageHandbrake, ExerciseConfig exercises, ExerciseDef exercise,
-        double? engineTempC = null) =>
-        Volatile.Write(ref _pendingReset, new ResetRequest(scene.BuildRoad(), positionM, engageHandbrake, exercises, exercise, scene, engineTempC));
+        double? engineTempC = null, StartPose? pose = null) =>
+        Volatile.Write(ref _pendingReset, new ResetRequest(pose != null ? Road.Flat() : scene.BuildRoad(), positionM, engageHandbrake, exercises, exercise, scene, engineTempC, pose));
 
     private void Run()
     {
@@ -186,7 +186,9 @@ public sealed class PhysicsLoop : IDisposable
         var vehicle = Effective();
         _session = _exercises != null && _exercise != null ? new ExerciseSession(_exercises, _exercise, vehicle, r.Scene) : null;
         _attemptId++;
-        return new Simulator(vehicle, r.Road, positionM: r.PositionM, engineTempC: r.EngineTempC);
+        return r.Pose is { } pose
+            ? new Simulator(vehicle, r.Road, engineTempC: r.EngineTempC, steering: true, startX: pose.X, startY: pose.Y, headingRad: pose.HeadingRad)
+            : new Simulator(vehicle, r.Road, positionM: r.PositionM, engineTempC: r.EngineTempC);
     }
 
     /// <summary>The tuned vehicle, with the current exercise's hill-assist setting if one is running.</summary>
@@ -216,3 +218,6 @@ public sealed class PhysicsLoop : IDisposable
     [DllImport("winmm.dll", EntryPoint = "timeEndPeriod")]
     private static extern uint TimeEndPeriod(uint ms);
 }
+
+/// <summary>Where a restart on the town map puts the car (M9); a reset with a pose turns steering on.</summary>
+public sealed record StartPose(double X, double Y, double HeadingRad);

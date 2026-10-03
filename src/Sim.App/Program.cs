@@ -7,10 +7,11 @@ using static Raylib_cs.Raylib;
 
 // Manual transmission practice simulator (docs/design.en.md).
 // Keys: Tab tuning panel, E exercises, R restart (the road start, or the current exercise),
-// H restart on the hill or the current exercise (also the right paddle), P replay of the last 10 s
+// H restart on the hill or the current exercise (also the right paddle), M hill road / town map (steering),
+// P replay of the last 10 s
 // (also triangle), T teaching mode (also O), V car, C air-con, F2 first-time setup, F11 borderless fullscreen,
 // E also lists the exams (Enter between exam parts), Esc leaves an exercise or exam, otherwise quits.
-// --screenshot FILE [--panel] [--hill] [--replay] [--teaching] [--setup] [--menu] [--progress] [--exercise ID] [--frames N] [--size WxH]:
+// --screenshot FILE [--panel] [--hill] [--replay] [--teaching] [--setup] [--menu] [--progress] [--town] [--exercise ID] [--frames N] [--size WxH]:
 // save a frame after start-up and exit (checks the visuals without a person). --hill and
 // --exercise ID also work on their own.
 string? screenshotPath = args.Length >= 2 && args[0] == "--screenshot" ? Path.GetFullPath(args[1]) : null;
@@ -29,6 +30,7 @@ var scene = Scene.FromJson(config.Read(ConfigFiles.SceneFile));
 var camera = CameraParams.FromJson(config.Read(ConfigFiles.CameraFile));
 var ffbParams = FfbParams.FromJson(config.Read(ConfigFiles.FfbFile));
 var exercises = ExerciseConfig.FromJson(config.Read(ConfigFiles.ExercisesFile));
+var town = TownMap.FromJson(config.Read(ConfigFiles.TownFile));
 // Driving data lives next to config/; unattended screenshot runs use a throwaway folder so they can
 // never mix with (or tempt anyone to delete) the real telemetry and score history.
 string dataRoot = screenshotPath != null
@@ -52,9 +54,11 @@ long recordedAttempt = -1;
 bool setupDone = config.Exists(ConfigFiles.SetupFile);
 var setup = SetupParams.FromJson(config.Read(setupDone ? ConfigFiles.SetupFile : ConfigFiles.SetupExampleFile));
 SceneView? sceneView = null;
+TownView? townView = null;
 const float RoadViewShare = 0.72f; // road on the top ~3/4, instruments below (design doc)
 EngineSound? engineSound = null;
 bool onHill = false;
+bool onTown = false; // free driving on the town map with steering (M9)
 UiButtons previousButtons = default;
 
 using var physics = new PhysicsLoop(vehicle, input, scene.BuildRoad());
@@ -93,12 +97,28 @@ void Restart(bool hill)
     examRun = null; // leaving an exam abandons it
     examSummaryOpen = false;
     onHill = hill;
-    physics.Reset(scene.BuildRoad(), hill ? scene.HillStartPositionM : 0, engageHandbrake: hill, scene.StartEngineTempC);
+    if (hill) onTown = false;
+    if (onTown) physics.Reset(Road.Flat(), 0, engageHandbrake: false, scene.StartEngineTempC, TownPose("townStart"));
+    else physics.Reset(scene.BuildRoad(), hill ? scene.HillStartPositionM : 0, engageHandbrake: hill, scene.StartEngineTempC);
+}
+
+StartPose TownPose(string id)
+{
+    var s = town.Start(id);
+    return new StartPose(s.X, s.Y, s.HeadingDeg * Math.PI / 180);
+}
+
+// M switches free driving between the hill road and the town map.
+void ToggleTown()
+{
+    onTown = !onTown;
+    Restart(hill: false);
 }
 
 void StartExercise(ExerciseDef e)
 {
     activeExercise = e;
+    onTown = false;
     bool hill = e.Start == StartPoint.HillStart;
     onHill = hill;
     physics.StartExercise(scene, scene.PositionOf(e.Start), engageHandbrake: hill, exercises, e, scene.StartEngineTempC);
@@ -160,7 +180,12 @@ var panel = new TuningPanel(
         o => { scene = (Scene)o; if (sceneView != null) sceneView.Scene = scene; Restart(onHill); }),
     new TunableDocument("Camera", ConfigFiles.CameraFile, typeof(CameraParams),
         config.Read(ConfigFiles.CameraFile), CameraParams.FromJson,
-        o => { camera = (CameraParams)o; if (sceneView != null) sceneView.Camera = camera; }),
+        o =>
+        {
+            camera = (CameraParams)o;
+            if (sceneView != null) sceneView.Camera = camera;
+            if (townView != null) townView.Camera = camera;
+        }),
     new TunableDocument("Force feedback", ConfigFiles.FfbFile, typeof(FfbParams),
         config.Read(ConfigFiles.FfbFile), FfbParams.FromJson,
         o => ffb.Params = (FfbParams)o),
@@ -184,8 +209,10 @@ if (!IsWindowReady())
 SetTargetFPS(60);
 Ui.Load();
 sceneView = new SceneView(scene, camera);
+townView = new TownView(town, camera);
 Restart(hill: false); // applies the scene's start temperature from the first drive
 if (args.Contains("--hill")) Restart(hill: true);
+if (args.Contains("--town")) ToggleTown();
 if (args.Contains("--teaching")) teaching = true;
 if (args.SkipWhile(a => a != "--exercise").Skip(1).FirstOrDefault() is { } exerciseId) StartExercise(exercises.Find(exerciseId));
 if (args.Contains("--menu")) exerciseUi.MenuOpen = true;
@@ -257,6 +284,7 @@ while (!WindowShouldClose())
         if (IsKeyPressed(KeyboardKey.P)) ToggleReplay(frame.Exercise.Result);
         if (IsKeyPressed(KeyboardKey.T)) ToggleTeaching();
         if (IsKeyPressed(KeyboardKey.V)) carMenu.Open = true;
+        if (IsKeyPressed(KeyboardKey.M) && examRun == null) ToggleTown();
         if (IsKeyPressed(KeyboardKey.C)) physics.AirConOn = !physics.AirConOn;
         if (IsKeyPressed(KeyboardKey.F2)) setupScreen.Open(setup);
         if (buttons.HillStart && !previousButtons.HillStart) RestartOrRetry(hill: true);
@@ -309,11 +337,21 @@ while (!WindowShouldClose())
     ];
     BeginDrawing();
     ClearBackground(Color.Black);
-    sceneView.Update(frame.State, GetFrameTime(), vehicle);
     float roadHeight = viewArea.Height * RoadViewShare;
-    sceneView.VerticalFovDeg = setupDone ? setup.VerticalFovDeg(roadHeight, GetMonitorWidth(GetCurrentMonitor())) : null;
-    sceneView.Draw(frame.State, new Rectangle(viewArea.X, viewArea.Y, viewArea.Width, roadHeight),
-        frame.Exercise.Live.LeadPositionM, frame.Exercise.Live.LeadBraking);
+    double? fov = setupDone ? setup.VerticalFovDeg(roadHeight, GetMonitorWidth(GetCurrentMonitor())) : null;
+    var viewRect = new Rectangle(viewArea.X, viewArea.Y, viewArea.Width, roadHeight);
+    if (frame.State.Steering)
+    {
+        townView.Update(frame.State, GetFrameTime(), vehicle);
+        townView.VerticalFovDeg = fov;
+        townView.Draw(frame.State, viewRect);
+    }
+    else
+    {
+        sceneView.Update(frame.State, GetFrameTime(), vehicle);
+        sceneView.VerticalFovDeg = fov;
+        sceneView.Draw(frame.State, viewRect, frame.Exercise.Live.LeadPositionM, frame.Exercise.Live.LeadBraking);
+    }
     var roadArea = new Rectangle(viewArea.X, viewArea.Y, viewArea.Width, roadHeight);
     if (teaching && !replayOpen) TeachingOverlay.Draw(frame, vehicle, roadArea);
     if (progressOpen)
@@ -341,7 +379,8 @@ while (!WindowShouldClose())
     carMenu.Draw(carFile, roadArea);
     Dashboard.Draw(frame, vehicle, scene.Dashboard, new Rectangle(viewArea.X, viewArea.Y + roadHeight, viewArea.Width, viewArea.Height - roadHeight));
     if (!panel.Visible)
-        Ui.Text($"physics {frame.PhysicsHz:F0} Hz  overruns {frame.Overruns}   Tab: tuning panel", 8, h - 24, 18, Color.Gray);
+        Ui.Text($"physics {frame.PhysicsHz:F0} Hz  overruns {frame.Overruns}   Tab: tuning panel   " +
+                $"M: {(onTown ? "hill road" : "town map")}", 8, h - 24, 18, Color.Gray);
     panel.Draw(panelArea, frame, vehicle);
     setupScreen.Draw(new Rectangle(0, 0, w, h));
 
@@ -363,6 +402,7 @@ while (!WindowShouldClose())
 }
 
 sceneView.Dispose();
+townView.Dispose();
 engineSound?.Dispose();
 Ui.Unload();
 CloseWindow();
