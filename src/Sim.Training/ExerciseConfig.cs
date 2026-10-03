@@ -85,7 +85,7 @@ public sealed record ExerciseDef
     public required StartPoint Start { get; init; }
     /// <summary>Forces hill-start assist on or off for this exercise; null keeps the vehicle setting.</summary>
     public bool? HillHold { get; init; }
-    /// <summary>Gear that must be engaged at the finish (1-6).</summary>
+    /// <summary>Lowest gear that counts at the finish (1-6); shifting higher before finishing is fine.</summary>
     public required int FinishGear { get; init; }
     public required double FinishMinSpeedKmh { get; init; }
     /// <summary>Distance forward from the start that must be covered (0 = none).</summary>

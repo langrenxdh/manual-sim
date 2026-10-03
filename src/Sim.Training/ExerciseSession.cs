@@ -104,7 +104,7 @@ public sealed class ExerciseSession
         else if (_elapsed > e.TimeLimitS) End(AttemptPhase.Failed, $"not finished within {e.TimeLimitS:0} s");
         else
         {
-            bool atFinish = (int)s.EngagedGear == e.FinishGear && s.ClutchLocked
+            bool atFinish = (int)s.EngagedGear >= e.FinishGear && s.ClutchLocked
                             && s.SpeedKmh >= e.FinishMinSpeedKmh && _distance >= e.FinishMinDistanceM;
             _finishHeld = atFinish ? _finishHeld + dtS : 0;
             if (atFinish && _finishHeld >= e.FinishHoldS) End(AttemptPhase.Completed, null);

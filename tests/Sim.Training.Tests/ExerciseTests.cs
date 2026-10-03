@@ -35,6 +35,17 @@ public class ExerciseTests
     }
 
     [Fact]
+    public void S1b_PullAwayThenShiftToSecondBeforeFinishing_StillCompletes()
+    {
+        // Pull away, then clutch in and select 2nd at 2.2 s, before 1st has held the finish for 1 s.
+        var s = Run("flatPullAway", t => t < 2.2
+            ? FlatPullAway(t, releaseS: 1.5, throttle: 0.15)
+            : new DriverInput(t < 2.6 ? 1 : Ramp(t, 2.6, 1.0, 1, 0), Throttle(t, 2.6, 0.2), 0, t < 2.4 ? Gear.Neutral : Gear.Second));
+
+        Assert.Equal(AttemptPhase.Completed, s.Phase);
+    }
+
+    [Fact]
     public void S2_ClutchDump_FailsWithAStallAndZero()
     {
         var s = Run("flatPullAway", t => FlatPullAway(t, releaseS: 0.2, throttle: 0));

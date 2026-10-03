@@ -157,10 +157,10 @@ Both ways of using it: **free driving** (drive as you like, as in v1) and **grad
 
 | # | Exercise | Start | Completed when | Fails when |
 | --- | --- | --- | --- | --- |
-| X1 | Flat pull-away | Road start, stopped, neutral, idling | In 1st, clutch locked for 1 s, ≥ 5 km/h | Stall |
-| X2 | Hill start (assist) | 6 m before the stop line, handbrake on, assist on | 15 m driven uphill, clutch locked | Stall, or rolls back more than 0.5 m |
+| X1 | Flat pull-away | Road start, stopped, neutral, idling | In 1st or higher, clutch locked for 1 s, ≥ 5 km/h | Stall |
+| X2 | Hill start (assist) | 6 m before the stop line, handbrake on, assist on | 15 m driven uphill, 1st or higher, clutch locked | Stall, or rolls back more than 0.5 m |
 | X3 | Hill start (handbrake) | Same, assist **off** | Same | Same |
-| X4 | Smooth upshifts | Road start, stopped | In 3rd, clutch locked, ≥ 40 km/h | Stall |
+| X4 | Smooth upshifts | Road start, stopped | In 3rd or higher, clutch locked, ≥ 40 km/h | Stall |
 
 **Metrics** (per attempt, computed every step at 1 kHz):
 
