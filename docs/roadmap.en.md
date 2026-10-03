@@ -88,6 +88,8 @@ v1 (M0–M3) is complete, and M4 (graded exercises and scoring) is built. This d
 
 ### M9 — Steering (v2 headline; ideas 9, 10, 11)
 
+**Status: implemented (2026-10-03), see the M9 decision record in the design doc; hand check pending.**
+
 Split into steps, each with its own gate:
 
 - **M9a hardware check (like M0):** read the wheel angle at 1 kHz (axis 0 already reads, 12k levels over the range); verify a constant-force effect can be updated at 100+ Hz to produce a smooth, variable centring torque without stutter, together with the judder sine. `HwProbe` gets a steering-torque test. Gate: smooth variable torque on the G29.

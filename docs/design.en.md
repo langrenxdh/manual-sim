@@ -34,7 +34,7 @@ Overall principle: v1 uses only the existing equipment; no design may depend on 
 | Device | Use | Known limits and mitigations |
 | --- | --- | --- |
 | G29 three pedals | Throttle, brake, clutch as three independent analog axes | Potentiometers, 8-bit (256 levels); the bite zone covers only ~50–75 levels, so low-pass filtering is required or quantisation steps cause fake judder |
-| G29 wheel | No steering; force feedback only, for engine judder and gear grinding | Dual-motor gear drive; periodic effects through SDL3 haptics |
+| G29 wheel | v1: no steering; force feedback only, for engine judder and gear grinding. M9 adds steering on the town map | Dual-motor gear drive; periodic effects through SDL3 haptics |
 | H-shifter | 6 gears + reverse | Passive lever, cannot block your hand; see shift rules below |
 | Wheel buttons | Handbrake, mode switch, replay | — |
 | Single monitor | Road + instrument strip at the bottom | First-time setup asks for screen width and viewing distance and computes the FOV |
@@ -240,6 +240,11 @@ There is no real-car data, so the "ground truth" is my driving experience with t
 | T9 | Idle-control usage cold vs warm (M7) | Over 30 % higher when cold | Cold engines have more internal friction |
 | T10 | Warm idle with the air-con on (M7) | Idle about 50 rpm higher (± 30), idle-control usage higher | The air-con is an extra load |
 | T11 | Every car: steady idle; 2.5 s clutch release in 1st with no throttle does not stall; the three cars really differ (M7) | Idle ± 50 rpm; pulls away without stalling and creeps; the diesel makes over 50 Nm more net torque than the Golf at 2000 rpm, the small NA engine over 80 Nm less at 1500 rpm | Every car is drivable and has its own character |
+| T12 | Steering on, 1st at 7 km/h, wheel held at 180° for 2 s (M9) | Turn radius = wheelbase / tan(wheel angle / steering ratio) within 2 %; front not sliding | Low-speed steering geometry |
+| T13 | 3rd at 60 km/h, wheel at 200°, light throttle (M9) | The front slides; lateral acceleration is exactly μg | Too much lock for the speed understeers |
+| T14 | 2nd at 20 km/h, wheel straight, 10 s (M9) | Heading and lateral position unchanged; the car moves on | A straight wheel goes straight |
+| T15 | 3rd at 50 km/h with the wheel at 20°, 45° and 200° left, and 45° right (M9) | Aligning torque opposes the turn, larger at 45° than at 20°, smaller when sliding (200°) than at 45° | The wheel pulls back to centre and goes light at the grip limit |
+| T16 | Steering off (the hill road), wheel turned 300° (M9) | The car follows the road: world X = road position, heading 0 | Steering never changes v1 behaviour |
 
 Every time I remember another "my car does this", add a row.
 
@@ -417,3 +422,20 @@ The milestones after M4 (M5–M10: coaching, more exercises, fidelity and other 
 | L4 | "More throttle" uses the stall margin (< 50 rpm above stalling), not idle-control usage | Measured: in the model the idle controller saturates at 100 % even in a gentle 3 s release, so usage cannot tell good from bad; the lowest rpm can: 2 s 463, 1.5 s 406 (6 rpm above stalling), faster stalls |
 | L5 | The other cues: bite point (in gear, nearly stopped, engagement above 0.05), rolling back (against the gear's direction faster than 0.1 m/s), over-rev, clutch hot | All are conditions on the physics state; the rules only decide when to speak |
 | L6 | Tests: 4 for exam verdicts; 3 for cues (a gentle pull-away says only "bite point", once; a clutch dump asks for throttle; releasing the handbrake on the hill without throttle says "rolling back") | As with scoring, scripted driving pins the intent |
+
+## M9 decision record (steering)
+
+2026-10-03, implemented locally. The gate "driving through the roundabout and the car park feels natural on the G29, and the longitudinal feel of v1 is unchanged" is pending my check on the G29.
+
+| # | Decision | Reason |
+| --- | --- | --- |
+| N1 | M9a: `HwProbe steer` updates a constant-force effect at 100 Hz with a virtual spring and damper from the wheel angle, with the judder sine on top. Result on the G29: 600 updates, 0 failures, slowest call 0.42 ms | SDL3's constant effect can carry a continuously varying steering torque |
+| N2 | Lateral model: kinematic single track. Road-wheel angle = wheel angle / steering ratio (clamped to full lock); path curvature tan δ / wheelbase; lateral acceleration v²κ, capped at μg. Beyond the cap the front slides (understeer) and the yaw rate is the capped acceleration / v. No tyre slip angles, no yaw inertia | Enough for town speeds (roundabouts, parking); simple and stable at 1 kHz; the grip cap gives understeer without a tyre model to tune |
+| N3 | Aligning torque = front-axle lateral force × (mechanical + pneumatic trail; the pneumatic part fades past the grip limit) × power-assist factor / steering ratio. Typical: 0.2 Nm in a tight turn at 10 km/h, 1–2.6 Nm cornering at 50–80 km/h | The wheel weights up with cornering and goes light when the front washes out, as in a real car |
+| N4 | Steering is a `Simulator` option, off by default. The hill road and every test before M9 run with it off and are unchanged (T16). With it on the road is flat and the pose is world X, Y and heading | The longitudinal model is untouched; T1–T11 stay green |
+| N5 | The town map is `config/town.json`: roads as straights and arcs, a roundabout (island 8 m, outer edge 16 m), a car park with 10 bays (2.6 × 5.4 m), and named start poses in the left lane. The dead end is 8 m wide. M switches free driving between the hill road and the town | One definition for drawing and judging. A Golf, with an ~11 m turning circle, cannot do a three-point turn in 6 m: the scripted turn needed 6+ legs |
+| N6 | Steering input: `"steering"` in `g29.json` (axis 0, inverted, range 900°); it reaches the physics as the wheel angle in degrees, positive = left | The G HUB operating range must match `rangeDeg` |
+| N7 | Steering force feedback, on the town map only: a constant force = aligning torque / `steeringFullScaleNm` (3 Nm) × `steeringGain` − `steeringDamperPerDegPerS` (0.0003) × wheel rate (filtered at 10 Hz), with judder, grinding and jolts on top as before. On the hill road the wheel stays free (spring 0) | All in `ffb.json` and the tuning panel; tune by feel |
+| N8 | Town exercises: roundabout (clockwise via the west side, out of the east exit in 2nd or higher), car-park bay (2nd bay from the left, nose in within 10°, stopped), three-point turn (in the dead end, pointing south within 15°, moving in 1st). New metric `offRoadS`: time with any corner of the car's outline (`townCar` in `exercises.json`) off the road. `via` areas must be passed in order; the finish zone needs the whole car inside and is drawn in yellow | "Line keeping" is judged as time off the road; goals only judge, never act on the car |
+| N9 | Tests: T12–T16 for steering physics, town map geometry tests, and S11–S13 with pure-pursuit scripted drivers: roundabout 100, anticlockwise shortcut never finishes; bay 97, wrong bay never finishes; three-point turn 86 when careful, 51 over the kerbs | As before, the tests pin the intent; `exercises.json` is tuned by feel |
+| N10 | Not in M9: giving way to other traffic at the roundabout, collisions and kerb physics, camera lag on turning | Out of scope for now; leaving the road is only judged |
