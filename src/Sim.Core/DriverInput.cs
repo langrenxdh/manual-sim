@@ -10,4 +10,5 @@ public readonly record struct DriverInput(
     double Brake,
     Gear Shifter,
     bool Handbrake = false,
-    bool Starter = false);
+    bool Starter = false,
+    bool AirCon = false);

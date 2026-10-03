@@ -19,6 +19,9 @@ public sealed record VehicleParams
     public required EnvironmentParams Environment { get; init; }
     public required HillHoldParams HillHold { get; init; }
     public required ShudderParams Shudder { get; init; }
+    public required ClutchThermalParams ClutchThermal { get; init; }
+    public required EngineThermalParams EngineThermal { get; init; }
+    public required AirConParams AirCon { get; init; }
 
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -63,6 +66,18 @@ public sealed record VehicleParams
         Require(Shudder.FadeOutRpm > Engine.StallRpm, "shudder.fadeOutRpm must be above engine.stallRpm");
         Positive(HillHold.HoldTimeS, "hillHold.holdTimeS");
         Positive(HillHold.ReleaseRateNPerS, "hillHold.releaseRateNPerS");
+        var ct = ClutchThermal;
+        Positive(ct.HeatCapacityJPerK, "clutchThermal.heatCapacityJPerK");
+        Require(ct.CoolingWPerK >= 0, "clutchThermal.coolingWPerK must be >= 0");
+        Require(ct.FadeEndC > ct.FadeStartC, "clutchThermal.fadeEndC must be above fadeStartC");
+        Require(ct.MinFrictionFactor is > 0 and <= 1, "clutchThermal.minFrictionFactor must be in (0, 1]");
+        var et = EngineThermal;
+        Positive(et.HeatCapacityJPerK, "engineThermal.heatCapacityJPerK");
+        Require(et.HeatPerMechanicalW >= 0 && et.CoolingWPerK >= 0 && et.ThermostatWPerK >= 0,
+            "engineThermal heat and cooling rates must be >= 0");
+        Require(et.WarmC > et.ColdReferenceC, "engineThermal.warmC must be above coldReferenceC");
+        Require(et.ColdFrictionExtra >= 0 && et.ColdIdleExtraRpm >= 0, "engineThermal cold extras must be >= 0");
+        Require(AirCon.LoadNm >= 0 && AirCon.IdleBumpRpm >= 0, "airCon values must be >= 0");
     }
 
     private static void Positive(double value, string name) => Require(value > 0, $"{name} must be > 0");
@@ -151,6 +166,55 @@ public sealed record EnvironmentParams
 {
     public required double GravityMps2 { get; init; }
     public required double AirDensityKgM3 { get; init; }
+    /// <summary>Air temperature: what the clutch and a cold engine start from and cool towards.</summary>
+    public required double AmbientTempC { get; init; }
+}
+
+/// <summary>
+/// Clutch heating (M7). Slip power heats a lumped mass that cools to ambient; above
+/// <see cref="FadeStartC"/> the friction coefficient falls linearly to <see cref="MinFrictionFactor"/>
+/// at <see cref="FadeEndC"/> (fade: less capacity, more slip).
+/// </summary>
+public sealed record ClutchThermalParams
+{
+    /// <summary>Effective heat capacity of the friction surfaces and pressure plate.</summary>
+    public required double HeatCapacityJPerK { get; init; }
+    public required double CoolingWPerK { get; init; }
+    public required double FadeStartC { get; init; }
+    public required double FadeEndC { get; init; }
+    public required double MinFrictionFactor { get; init; }
+    /// <summary>Above this the driver would smell the clutch: a warning only, no physics.</summary>
+    public required double SmellAboveC { get; init; }
+}
+
+/// <summary>
+/// Engine temperature (M7). Waste heat (a multiple of the mechanical combustion power) warms a lumped
+/// mass that cools to ambient; a thermostat adds strong cooling above <see cref="WarmC"/>. Below it the
+/// "cold factor" rises linearly to 1 at <see cref="ColdReferenceC"/>, adding internal friction and
+/// raising the ECU idle target.
+/// </summary>
+public sealed record EngineThermalParams
+{
+    public required double HeatCapacityJPerK { get; init; }
+    /// <summary>Waste heat per watt of mechanical combustion power (roughly (1 - efficiency) / efficiency).</summary>
+    public required double HeatPerMechanicalW { get; init; }
+    public required double CoolingWPerK { get; init; }
+    /// <summary>Operating temperature; the thermostat holds the engine here.</summary>
+    public required double WarmC { get; init; }
+    public required double ThermostatWPerK { get; init; }
+    /// <summary>At or below this the cold effects are complete.</summary>
+    public required double ColdReferenceC { get; init; }
+    /// <summary>Extra internal friction at full cold, as a fraction of the warm friction curve.</summary>
+    public required double ColdFrictionExtra { get; init; }
+    /// <summary>ECU idle target raise at full cold.</summary>
+    public required double ColdIdleExtraRpm { get; init; }
+}
+
+/// <summary>Air-conditioning compressor (M7): a load torque on the crank and an ECU idle raise while on.</summary>
+public sealed record AirConParams
+{
+    public required double LoadNm { get; init; }
+    public required double IdleBumpRpm { get; init; }
 }
 
 /// <summary>Golf hill-start assist, modelled as retained brake pressure.</summary>

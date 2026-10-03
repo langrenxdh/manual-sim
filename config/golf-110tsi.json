@@ -58,7 +58,8 @@
   },
   "environment": {
     "gravityMps2": 9.81,
-    "airDensityKgM3": 1.2
+    "airDensityKgM3": 1.2,
+    "ambientTempC": 25
   },
   "hillHold": {
     "enabled": true,
@@ -75,5 +76,27 @@
     "fadeOutRpm": 1300,
     "irregularity": 0.3,
     "seed": 20190101
+  },
+  "clutchThermal": {
+    "heatCapacityJPerK": 3000,
+    "coolingWPerK": 15,
+    "fadeStartC": 250,
+    "fadeEndC": 350,
+    "minFrictionFactor": 0.6,
+    "smellAboveC": 220
+  },
+  "engineThermal": {
+    "heatCapacityJPerK": 35000,
+    "heatPerMechanicalW": 1.9,
+    "coolingWPerK": 20,
+    "warmC": 90,
+    "thermostatWPerK": 2000,
+    "coldReferenceC": 0,
+    "coldFrictionExtra": 0.5,
+    "coldIdleExtraRpm": 300
+  },
+  "airCon": {
+    "loadNm": 8,
+    "idleBumpRpm": 50
   }
 }

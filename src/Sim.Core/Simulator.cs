@@ -35,9 +35,14 @@ public sealed class Simulator
     private Gear _gear;
     private bool _grinding;
     private double _driveForceN;
+    private double _clutchTempC;  // M7: lumped clutch temperature
+    private double _engineTempC;  // M7: lumped engine temperature
+    private bool _airCon;
+    private double _idleTargetRpm;
 
+    /// <param name="engineTempC">Engine temperature at start; null = warm (operating temperature).</param>
     public Simulator(VehicleParams parameters, Road road, Gear gear = Gear.Neutral,
-        double speedMps = 0, double? engineRpm = null, double positionM = 0)
+        double speedMps = 0, double? engineRpm = null, double positionM = 0, double? engineTempC = null)
     {
         parameters.Validate();
         _p = parameters;
@@ -46,6 +51,9 @@ public sealed class Simulator
         _gear = gear;
         _v = speedMps;
         _x = positionM;
+        _engineTempC = engineTempC ?? parameters.EngineThermal.WarmC;
+        _clutchTempC = parameters.Environment.AmbientTempC;
+        _idleTargetRpm = parameters.Engine.IdleRpm + parameters.EngineThermal.ColdIdleExtraRpm * ColdFactor(parameters);
 
         double matchedRpm = gear == Gear.Neutral ? 0 : Units.RadPerSecToRpm(InputShaftPerMetre(gear) * speedMps);
         bool rolling = gear != Gear.Neutral && speedMps != 0;
@@ -56,7 +64,7 @@ public sealed class Simulator
 
         // Start in steady state: idle controller already supplying the idle friction torque.
         if (Math.Abs(rpm - parameters.Engine.IdleRpm) < 1e-9)
-            _idleIntegral = Math.Min(parameters.Engine.FrictionTorqueNm.Evaluate(rpm), parameters.IdleControl.MaxTorqueNm);
+            _idleIntegral = Math.Min(EngineFriction(parameters, rpm, airCon: false), parameters.IdleControl.MaxTorqueNm);
         _boost = 0;
 
         State = BuildState(road.GradeAt(positionM), 0, 0, 0, 0, 0, 0, 0, 0, false, 0);
@@ -101,7 +109,11 @@ public sealed class Simulator
         double fullTorque = firing ? e.NaTorqueNm.Evaluate(rpm) + _boost * e.BoostTorqueNm.Evaluate(rpm) : 0;
 
         var ic = p.IdleControl;
-        double idleErrorRpm = e.IdleRpm - rpm;
+        // The ECU idles higher when the engine is cold and when the air-con compressor is running.
+        _airCon = input.AirCon;
+        _idleTargetRpm = e.IdleRpm + p.EngineThermal.ColdIdleExtraRpm * ColdFactor(p)
+                         + (input.AirCon ? p.AirCon.IdleBumpRpm : 0);
+        double idleErrorRpm = _idleTargetRpm - rpm;
         _idleIntegral = Math.Clamp(_idleIntegral + ic.IntegralGainNmPerRpmS * idleErrorRpm * dt, 0, ic.MaxTorqueNm);
         double idleTorque = Math.Clamp(ic.ProportionalGainNmPerRpm * idleErrorRpm + _idleIntegral, 0, ic.MaxTorqueNm);
         double idleThrottle = fullTorque > 0 ? Math.Min(1, idleTorque / fullTorque) : 0;
@@ -123,7 +135,7 @@ public sealed class Simulator
             : 0;
 
         double engineActive = combustion + pulsation + starter;
-        double engineFriction = e.FrictionTorqueNm.Evaluate(Math.Abs(rpm));
+        double engineFriction = EngineFriction(p, rpm, input.AirCon);
 
         // Vehicle loads
         var ch = p.Chassis;
@@ -133,7 +145,7 @@ public sealed class Simulator
             + (input.Handbrake ? ch.HandbrakeForceN : 0);
         double vehicleFrictionN = ch.RollingResistanceCoeff * mass * gravity * Math.Cos(slope) + brakeN;
 
-        double clutchCapacity = engagement * p.Clutch.MaxTorqueNm;
+        double clutchCapacity = engagement * p.Clutch.MaxTorqueNm * ClutchFrictionFactor(p);
         var gb = p.Gearbox;
         double previousSpeed = _v;
         double clutchTorque;
@@ -160,12 +172,51 @@ public sealed class Simulator
             _driveForceN = clutchTorque * k * eta;
         }
 
+        UpdateTemperatures(p, clutchTorque, combustion, dt);
         _x += _v * dt;
         _steps++;
 
         double idleUsage = ic.MaxTorqueNm > 0 ? idleTorque / ic.MaxTorqueNm : 1;
         State = BuildState(grade, throttle, idleTorque, idleUsage, combustion + pulsation, engineFriction,
             shudderIntensity, engagement, clutchTorque, firing, (_v - previousSpeed) / dt);
+    }
+
+    /// <summary>0 when warm, rising linearly to 1 at the cold reference temperature.</summary>
+    private double ColdFactor(VehicleParams p)
+    {
+        var t = p.EngineThermal;
+        return Math.Clamp((t.WarmC - _engineTempC) / (t.WarmC - t.ColdReferenceC), 0, 1);
+    }
+
+    /// <summary>Internal friction: the warm curve, raised when cold, plus the air-con compressor load.</summary>
+    private double EngineFriction(VehicleParams p, double rpm, bool airCon) =>
+        p.Engine.FrictionTorqueNm.Evaluate(Math.Abs(rpm)) * (1 + p.EngineThermal.ColdFrictionExtra * ColdFactor(p))
+        + (airCon ? p.AirCon.LoadNm : 0);
+
+    /// <summary>Clutch friction coefficient relative to cold: 1 until fade starts, falling to the minimum.</summary>
+    private double ClutchFrictionFactor(VehicleParams p)
+    {
+        var t = p.ClutchThermal;
+        double fade = Math.Clamp((_clutchTempC - t.FadeStartC) / (t.FadeEndC - t.FadeStartC), 0, 1);
+        return 1 - fade * (1 - t.MinFrictionFactor);
+    }
+
+    /// <summary>
+    /// Clutch: slip power (transmitted torque x slip speed) heats it; it cools towards ambient.
+    /// Engine: waste heat in proportion to mechanical combustion power warms it; it cools towards
+    /// ambient, and the thermostat adds strong cooling above operating temperature.
+    /// </summary>
+    private void UpdateTemperatures(VehicleParams p, double clutchTorque, double combustionTorque, double dt)
+    {
+        double ambient = p.Environment.AmbientTempC;
+        var c = p.ClutchThermal;
+        double slipW = _clutchLocked ? 0 : Math.Abs(clutchTorque * (_we - _wIn));
+        _clutchTempC += (slipW - c.CoolingWPerK * (_clutchTempC - ambient)) / c.HeatCapacityJPerK * dt;
+
+        var e = p.EngineThermal;
+        double heatW = e.HeatPerMechanicalW * Math.Max(0, combustionTorque * _we);
+        double coolW = e.CoolingWPerK * (_engineTempC - ambient) + e.ThermostatWPerK * Math.Max(0, _engineTempC - e.WarmC);
+        _engineTempC += (heatW - coolW) / e.HeatCapacityJPerK * dt;
     }
 
     /// <summary>Gearbox input shaft rad/s per m/s of vehicle speed for a gear (negative in reverse).</summary>
@@ -327,6 +378,12 @@ public sealed class Simulator
             HillHold = _hillHold.State,
             HillHoldRemainingS = _hillHold.RemainingS,
             HillHoldForceN = _hillHold.ForceN,
+            ClutchTempC = _clutchTempC,
+            ClutchFrictionFactor = ClutchFrictionFactor(_p),
+            ClutchSmell = _clutchTempC > _p.ClutchThermal.SmellAboveC,
+            EngineTempC = _engineTempC,
+            IdleTargetRpm = _idleTargetRpm,
+            AirCon = _airCon,
         };
     }
 }

@@ -54,4 +54,15 @@ public readonly record struct SimState
     public HillHoldState HillHold { get; init; }
     public double HillHoldRemainingS { get; init; }
     public double HillHoldForceN { get; init; }
+
+    // Temperatures and accessories (M7)
+    public double ClutchTempC { get; init; }
+    /// <summary>Clutch friction relative to a cool clutch (below 1 = fading).</summary>
+    public double ClutchFrictionFactor { get; init; }
+    /// <summary>Hot enough that a driver would smell the clutch (warning only).</summary>
+    public bool ClutchSmell { get; init; }
+    public double EngineTempC { get; init; }
+    /// <summary>Idle speed the ECU is aiming for right now (higher when cold or with the air-con on).</summary>
+    public double IdleTargetRpm { get; init; }
+    public bool AirCon { get; init; }
 }
