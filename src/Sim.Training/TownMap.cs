@@ -19,6 +19,7 @@ public sealed record TownMap
     public const double PointSpacingM = 1.0;
 
     private IReadOnlyList<(TownRoad Road, IReadOnlyList<(double X, double Y)> Points)>? _expanded;
+    private (double MinX, double MinY, double MaxX, double MaxY)[]? _bounds;
 
     public static TownMap FromJson(string json)
     {
@@ -97,8 +98,14 @@ public sealed record TownMap
         if (dr <= rb.OuterRadiusM) return true;
         var cp = CarPark;
         if (x >= cp.Corner[0] && x <= cp.Corner[0] + cp.Size[0] && y >= cp.Corner[1] && y <= cp.Corner[1] + cp.Size[1]) return true;
-        foreach (var (road, pts) in Expanded)
+        // Each road's bounding box first: town exercises ask for every car corner at every physics step.
+        _bounds ??= Expanded.Select(r => (r.Points.Min(p => p.X) - r.Road.WidthM, r.Points.Min(p => p.Y) - r.Road.WidthM,
+            r.Points.Max(p => p.X) + r.Road.WidthM, r.Points.Max(p => p.Y) + r.Road.WidthM)).ToArray();
+        for (int k = 0; k < Expanded.Count; k++)
         {
+            var (road, pts) = Expanded[k];
+            var b = _bounds[k];
+            if (x < b.MinX || x > b.MaxX || y < b.MinY || y > b.MaxY) continue;
             double half = road.WidthM / 2;
             for (int i = 1; i < pts.Count; i++)
                 if (DistanceToSegment(x, y, pts[i - 1], pts[i]) <= half) return true;

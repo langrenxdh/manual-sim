@@ -32,7 +32,8 @@ public class ScorerTests
         var config = Configs.Exercises();
         Assert.Equal(
             ["flatPullAway", "hillStartAssist", "hillStartHandbrake", "smoothUpshifts",
-             "trafficQueue", "stopAndHillStart", "downhill", "reverseUphill", "revMatchDownshift"],
+             "trafficQueue", "stopAndHillStart", "downhill", "reverseUphill", "revMatchDownshift",
+             "roundabout", "carParkBay", "threePointTurn"],
             config.Exercises.Select(e => e.Id));
         Assert.All(config.Exercises, e => Assert.Equal(100, e.Scoring.Sum(s => s.Weight), 9));
     }

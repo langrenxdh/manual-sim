@@ -18,7 +18,8 @@ public readonly record struct AttemptMetrics(
     double BrakeS = 0,
     double CoastingS = 0,
     double RevMatchErrorRpm = 0,
-    double DownshiftJerkMps3 = 0)
+    double DownshiftJerkMps3 = 0,
+    double OffRoadS = 0)
 {
     public double Get(Metric m) => m switch
     {
@@ -35,6 +36,7 @@ public readonly record struct AttemptMetrics(
         Metric.CoastingS => CoastingS,
         Metric.RevMatchErrorRpm => RevMatchErrorRpm,
         Metric.DownshiftJerkMps3 => DownshiftJerkMps3,
+        Metric.OffRoadS => OffRoadS,
         _ => throw new ArgumentOutOfRangeException(nameof(m)),
     };
 }
@@ -46,7 +48,9 @@ public readonly record struct AttemptLive(
     double? GapM,
     bool StoppedAtLine,
     bool DownshiftArmed,
-    bool DownshiftDone);
+    bool DownshiftDone,
+    bool OffRoad = false,
+    int ViaDone = 0);
 
 public enum AttemptPhase { Running, Completed, Failed }
 
@@ -66,6 +70,10 @@ public sealed class ExerciseSession
     private double _gapOutside, _stopError, _overSpeed, _brake, _coasting, _revMatchError, _downshiftJerk;
     private double _leadPosition, _leadPreviousSpeed, _stoppedFor;
     private double? _gap;
+    private readonly TownMap? _town;
+    private double _offRoad;
+    private bool _offRoadNow;
+    private int _viaDone;
     private bool _primed, _wasFiring, _stoppedAtLine, _downshiftArmed, _downshiftDone, _leadBraking;
     private int _stalls;
     private readonly List<TraceSample> _trace;
@@ -79,10 +87,17 @@ public sealed class ExerciseSession
     public ScoreResult? Result { get; private set; }
 
     /// <param name="scene">Where the stop line is; needed only by exercises with a <see cref="ExerciseDef.StopLine"/>.</param>
-    public ExerciseSession(ExerciseConfig config, ExerciseDef exercise, VehicleParams vehicle, Scene? scene = null)
+    /// <param name="town">The town map; needed only by exercises with a <see cref="ExerciseDef.TownStart"/>.</param>
+    public ExerciseSession(ExerciseConfig config, ExerciseDef exercise, VehicleParams vehicle, Scene? scene = null, TownMap? town = null)
     {
         if (exercise.StopLine != null && scene == null)
             throw new ArgumentException($"Exercise \"{exercise.Id}\" has a stop line and needs the scene.", nameof(scene));
+        if (exercise.TownStart != null)
+        {
+            _town = town ?? throw new ArgumentException($"Exercise \"{exercise.Id}\" runs in town and needs the town map.", nameof(town));
+            town.Start(exercise.TownStart); // throws for an unknown start
+            FinishZone = exercise.FinishZone?.Resolve(town);
+        }
         _config = config;
         Exercise = exercise;
         _engineStallRpm = vehicle.Engine.StallRpm;
@@ -101,10 +116,13 @@ public sealed class ExerciseSession
         exercise.HillHold is bool on ? vehicle with { HillHold = vehicle.HillHold with { Enabled = on } } : vehicle;
 
     public AttemptMetrics Metrics => new(_elapsed, _distance, _slipEnergyJ / 1000, _peakJerk, _rollback, _grinding,
-        _overRev, _stalls, _gapOutside, _stopError, _overSpeed, _brake, _coasting, _revMatchError, _downshiftJerk);
+        _overRev, _stalls, _gapOutside, _stopError, _overSpeed, _brake, _coasting, _revMatchError, _downshiftJerk, _offRoad);
 
     public AttemptLive Live => new(Exercise.Lead != null ? _leadPosition : null, _leadBraking, _gap, _stoppedAtLine,
-        _downshiftArmed, _downshiftDone);
+        _downshiftArmed, _downshiftDone, _offRoadNow, _viaDone);
+
+    /// <summary>A town exercise's finish zone as [minX, minY, maxX, maxY], or null.</summary>
+    public double[]? FinishZone { get; }
 
     /// <summary>Feed one physics step (after <see cref="Simulator.Step"/>) with the input that drove it.</summary>
     public void Observe(in SimState s, in DriverInput input, double dtS)
@@ -160,6 +178,7 @@ public sealed class ExerciseSession
 
         string? fail = ObserveLead(e.Lead, s, dtS) ?? ObserveStopLine(e.StopLine, s, stopped, dtS);
         ObserveDownshift(e.Downshift, s, jerk);
+        ObserveTown(s, dtS);
 
         if (_stalls > 0) End(AttemptPhase.Failed, "stalled");
         else if (fail != null) End(AttemptPhase.Failed, fail);
@@ -180,12 +199,45 @@ public sealed class ExerciseSession
             return _elapsed >= lead.EndTimeS && stopped;
         if (e.StopLine != null && !_stoppedAtLine) return false;
         if (e.Downshift is { } d && !_downshiftDone) return false;
+        if (_town != null && !InFinishZone(s)) return false;
+        if (e.FinishZone is { Stopped: true }) return stopped;
 
         int gear = (int)s.EngagedGear;
         bool inGear = e.Downshift is { } ds ? gear == ds.ToGear
             : e.Direction == TravelDirection.Reverse ? s.EngagedGear == Gear.Reverse
             : gear >= e.FinishGear;
-        return inGear && s.ClutchLocked && speedKmh >= e.FinishMinSpeedKmh && _distance >= e.FinishMinDistanceM;
+        // In town the distance along the road means nothing (turns, reversing); the zone replaces it.
+        bool farEnough = _town != null || _distance >= e.FinishMinDistanceM;
+        return inGear && s.ClutchLocked && speedKmh >= e.FinishMinSpeedKmh && farEnough;
+    }
+
+    /// <summary>Town exercises: time with the car partly off the road, and progress through the via areas.</summary>
+    private void ObserveTown(in SimState s, double dtS)
+    {
+        if (_town == null) return;
+        _offRoadNow = false;
+        foreach (var (x, y) in _config.TownCar!.Corners(s.WorldX, s.WorldY, s.HeadingRad))
+        {
+            if (_town.OnRoad(x, y)) continue;
+            _offRoadNow = true;
+            break;
+        }
+        if (_offRoadNow) _offRoad += dtS;
+        var via = Exercise.Via;
+        if (_viaDone < via.Length && TownZoneDef.Inside(via[_viaDone], s.WorldX, s.WorldY)) _viaDone++;
+    }
+
+    /// <summary>Every via area passed, the whole car inside the finish zone and pointing the right way.</summary>
+    private bool InFinishZone(in SimState s)
+    {
+        if (_viaDone < Exercise.Via.Length) return false;
+        if (FinishZone is not { } zone || Exercise.FinishZone is not { } z) return true;
+        if (z.HeadingDeg is double want)
+        {
+            double diff = Math.IEEERemainder(s.HeadingRad * 180 / Math.PI - want, 360);
+            if (Math.Abs(diff) > z.HeadingToleranceDeg) return false;
+        }
+        return _config.TownCar!.Corners(s.WorldX, s.WorldY, s.HeadingRad).All(c => TownZoneDef.Inside(zone, c.X, c.Y));
     }
 
     /// <summary>Moves the scripted lead car and judges the gap. Returns a failure reason or null.</summary>

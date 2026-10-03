@@ -43,6 +43,8 @@ public enum Metric
     RevMatchErrorRpm,
     /// <summary>Peak jerk from the downshift onwards, not counting the launch (M6 downshift).</summary>
     DownshiftJerkMps3,
+    /// <summary>Time with any corner of the car off the road (M9 town exercises).</summary>
+    OffRoadS,
 }
 
 /// <summary>
@@ -62,6 +64,8 @@ public sealed record ExerciseConfig
     /// <summary>Speed below which the car counts as stopped (stop line, queue).</summary>
     public required double StoppedBelowKmh { get; init; }
     public required GradeThresholds Grades { get; init; }
+    /// <summary>The car's outline for town exercises (off-road and goal zones); needed when any has a town start.</summary>
+    public TownCarDef? TownCar { get; init; }
     public required CoachingParams Coaching { get; init; }
     public required ExerciseDef[] Exercises { get; init; }
     /// <summary>Driving exams built from the exercises (M8).</summary>
@@ -93,6 +97,8 @@ public sealed record ExerciseConfig
         Require(Exercises.Length > 0, "at least one exercise is required");
         Require(Exercises.Select(e => e.Id).Distinct().Count() == Exercises.Length, "exercise ids must be unique");
         foreach (var e in Exercises) e.Validate();
+        Require(TownCar != null || Exercises.All(e => e.TownStart == null), "townCar is required by exercises with a townStart");
+        TownCar?.Validate();
         Require(Exams.Select(x => x.Id).Distinct().Count() == Exams.Length, "exam ids must be unique");
         foreach (var x in Exams) x.Validate(this);
     }
@@ -120,7 +126,17 @@ public sealed record ExerciseDef
     public required string Name { get; init; }
     /// <summary>One line telling the driver what to do.</summary>
     public required string Goal { get; init; }
-    public required StartPoint Start { get; init; }
+    /// <summary>Where on the hill road the exercise starts (ignored with a <see cref="TownStart"/>).</summary>
+    public StartPoint Start { get; init; } = StartPoint.RoadStart;
+    /// <summary>
+    /// A start id from <c>town.json</c>: the exercise runs on the town map with steering (M9) instead of
+    /// the hill road.
+    /// </summary>
+    public string? TownStart { get; init; }
+    /// <summary>Town exercises: areas the car's reference point must pass through, in order, before the finish.</summary>
+    public double[][] Via { get; init; } = [];
+    /// <summary>Town exercises: where the whole car must be to finish.</summary>
+    public TownZoneDef? FinishZone { get; init; }
     public TravelDirection Direction { get; init; } = TravelDirection.Forward;
     /// <summary>Forces hill-start assist on or off for this exercise; null keeps the vehicle setting.</summary>
     public bool? HillHold { get; init; }
@@ -159,6 +175,10 @@ public sealed record ExerciseDef
         Lead?.Validate(n);
         StopLine?.Validate(n);
         Downshift?.Validate(n);
+        ExerciseConfig.Require(TownStart != null || (FinishZone == null && Via.Length == 0), $"{n}: finishZone and via need a townStart");
+        ExerciseConfig.Require(TownStart == null || (Lead == null && StopLine == null), $"{n}: town exercises have no lead car or stop line");
+        foreach (var v in Via) ExerciseConfig.Require(TownZoneDef.IsArea(v), $"{n}: each via area is [minX, minY, maxX, maxY]");
+        FinishZone?.Validate(n);
         ExerciseConfig.Require(Scoring.Select(s => s.Metric).Distinct().Count() == Scoring.Length,
             $"{n}: each metric may appear once");
         foreach (var s in Scoring)
@@ -250,6 +270,69 @@ public sealed record DownshiftDef
         ExerciseConfig.Require(FromGear is >= 2 and <= 6 && ToGear >= 1 && ToGear < FromGear, $"{n}: downshift gears must go down");
         ExerciseConfig.Require(MinSpeedKmh > 0 && BiteEngagement is > 0 and < 1, $"{n}: downshift speed > 0, biteEngagement in (0, 1)");
     }
+}
+
+/// <summary>The car's outline around its world reference point (the centre of gravity), for town exercises.</summary>
+public sealed record TownCarDef
+{
+    public required double FrontOfReferenceM { get; init; }
+    public required double RearOfReferenceM { get; init; }
+    public required double WidthM { get; init; }
+
+    internal void Validate() =>
+        ExerciseConfig.Require(FrontOfReferenceM > 0 && RearOfReferenceM > 0 && WidthM > 0, "townCar dimensions must be > 0");
+
+    /// <summary>The four corners for a reference point and heading (radians counter-clockwise from +X).</summary>
+    public (double X, double Y)[] Corners(double x, double y, double heading)
+    {
+        double fx = Math.Cos(heading), fy = Math.Sin(heading), lx = -fy, ly = fx, half = WidthM / 2;
+        return
+        [
+            (x + fx * FrontOfReferenceM + lx * half, y + fy * FrontOfReferenceM + ly * half),
+            (x + fx * FrontOfReferenceM - lx * half, y + fy * FrontOfReferenceM - ly * half),
+            (x - fx * RearOfReferenceM - lx * half, y - fy * RearOfReferenceM - ly * half),
+            (x - fx * RearOfReferenceM + lx * half, y - fy * RearOfReferenceM + ly * half),
+        ];
+    }
+}
+
+/// <summary>
+/// A town exercise's finish: the whole car inside an area (or a car-park bay), optionally pointing a
+/// given way, and either stopped or meeting the exercise's usual gear and speed conditions.
+/// </summary>
+public sealed record TownZoneDef
+{
+    /// <summary>[minX, minY, maxX, maxY]; or use <see cref="Bay"/>.</summary>
+    public double[]? Area { get; init; }
+    /// <summary>Index of a car-park bay in <c>town.json</c> (0 = westmost).</summary>
+    public int? Bay { get; init; }
+    /// <summary>Required heading (degrees counter-clockwise from east); null = any.</summary>
+    public double? HeadingDeg { get; init; }
+    public double HeadingToleranceDeg { get; init; }
+    /// <summary>True: finish stopped in the zone (parking). False: the usual finish gear and speed apply.</summary>
+    public bool Stopped { get; init; }
+
+    internal static bool IsArea(double[] a) => a.Length == 4 && a[0] < a[2] && a[1] < a[3];
+
+    internal void Validate(string n)
+    {
+        ExerciseConfig.Require((Area == null) != (Bay == null), $"{n}: finishZone needs exactly one of area and bay");
+        ExerciseConfig.Require(Area == null || IsArea(Area), $"{n}: finishZone.area is [minX, minY, maxX, maxY]");
+        ExerciseConfig.Require(Bay is null or >= 0, $"{n}: finishZone.bay must be >= 0");
+        ExerciseConfig.Require(HeadingDeg == null || HeadingToleranceDeg > 0, $"{n}: finishZone.headingToleranceDeg must be > 0");
+    }
+
+    /// <summary>The zone as [minX, minY, maxX, maxY] on a town map.</summary>
+    public double[] Resolve(TownMap town)
+    {
+        if (Area != null) return Area;
+        var bays = town.Bays().ToList();
+        if (Bay!.Value >= bays.Count) throw new ArgumentException($"finishZone.bay {Bay} is not one of the {bays.Count} bays.");
+        var b = bays[Bay.Value];
+        return [b.MinX, b.MinY, b.MaxX, b.MaxY];
+    }
+
+    public static bool Inside(double[] a, double x, double y) => x >= a[0] && x <= a[2] && y >= a[1] && y <= a[3];
 }
 
 /// <summary>

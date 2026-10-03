@@ -5,6 +5,9 @@
 // (jerk filtered at 3 Hz: smooth 2 s pull-away ~26 m/s^3, 80 % throttle flare ~87); tune by feel,
 // but keep those tests' intent. "coaching" sets the ghost comparison (a pedal differs from the best attempt by
 // more than divergencePedalGap of its travel for divergenceHoldS) and the progress view windows.
+// Town exercises (M9, "townStart" from town.json) steer on the town map: "via" areas [minX, minY, maxX, maxY]
+// must be passed in order, then the whole car (outline "townCar", around its centre of gravity) must be
+// inside "finishZone" (an area or a car-park bay), pointing the given way. offRoadS is time with any corner off the road.
 {
   "jerkFilterHz": 3,
   "pedalPressedAbove": 0.1,
@@ -12,6 +15,7 @@
   "coastingMaxEngagement": 0.5,
   "stoppedBelowKmh": 0.5,
   "grades": { "a": 90, "b": 75, "c": 50 },
+  "townCar": { "frontOfReferenceM": 1.9, "rearOfReferenceM": 2.36, "widthM": 1.79 },
   "coaching": { "divergencePedalGap": 0.15, "divergenceHoldS": 0.2, "recentAttempts": 5, "trendAttempts": 10 },
   "exercises": [
     {
@@ -182,6 +186,63 @@
         { "metric": "downshiftJerkMps3", "good": 30, "bad": 100, "weight": 30 },
         { "metric": "grindingS", "good": 0, "bad": 0.5, "weight": 15 },
         { "metric": "timeS", "good": 40, "bad": 80, "weight": 15 }
+      ]
+    },
+    {
+      "id": "roundabout",
+      "name": "Roundabout (town)",
+      "goal": "Steer: go clockwise round the roundabout and take the third exit (east) in 2nd or higher.",
+      "townStart": "roundaboutApproach",
+      "via": [[238, 206, 252, 226]],
+      "finishZone": { "area": [296, 212, 336, 220], "headingDeg": 0, "headingToleranceDeg": 20 },
+      "finishGear": 2,
+      "finishMinSpeedKmh": 10,
+      "finishMinDistanceM": 0,
+      "finishHoldS": 1,
+      "timeLimitS": 90,
+      "scoring": [
+        { "metric": "offRoadS", "good": 0, "bad": 3, "weight": 35 },
+        { "metric": "clutchSlipEnergyKJ", "good": 8, "bad": 30, "weight": 20 },
+        { "metric": "peakJerkMps3", "good": 35, "bad": 90, "weight": 20 },
+        { "metric": "grindingS", "good": 0, "bad": 0.5, "weight": 10 },
+        { "metric": "timeS", "good": 35, "bad": 75, "weight": 15 }
+      ]
+    },
+    {
+      "id": "carParkBay",
+      "name": "Park in a bay (town)",
+      "goal": "Steer: drive into the car park and stop nose-in, square, inside the 2nd bay from the left.",
+      "townStart": "carParkApproach",
+      "finishZone": { "bay": 1, "headingDeg": 90, "headingToleranceDeg": 10, "stopped": true },
+      "finishGear": 1,
+      "finishMinSpeedKmh": 0,
+      "finishMinDistanceM": 0,
+      "finishHoldS": 1,
+      "timeLimitS": 90,
+      "scoring": [
+        { "metric": "offRoadS", "good": 0, "bad": 2, "weight": 30 },
+        { "metric": "clutchSlipEnergyKJ", "good": 10, "bad": 35, "weight": 25 },
+        { "metric": "peakJerkMps3", "good": 35, "bad": 90, "weight": 25 },
+        { "metric": "timeS", "good": 35, "bad": 75, "weight": 20 }
+      ]
+    },
+    {
+      "id": "threePointTurn",
+      "name": "Three-point turn (town)",
+      "goal": "Steer: turn round in the narrow dead end (forward, reverse, forward) and drive back south.",
+      "townStart": "deadEnd",
+      "finishZone": { "area": [256, 236, 264, 300], "headingDeg": 270, "headingToleranceDeg": 15 },
+      "finishGear": 1,
+      "finishMinSpeedKmh": 3,
+      "finishMinDistanceM": 0,
+      "finishHoldS": 1,
+      "timeLimitS": 120,
+      "scoring": [
+        { "metric": "offRoadS", "good": 0, "bad": 3, "weight": 35 },
+        { "metric": "clutchSlipEnergyKJ", "good": 15, "bad": 45, "weight": 20 },
+        { "metric": "peakJerkMps3", "good": 35, "bad": 90, "weight": 20 },
+        { "metric": "grindingS", "good": 0, "bad": 0.5, "weight": 10 },
+        { "metric": "timeS", "good": 45, "bad": 100, "weight": 15 }
       ]
     }
   ],
