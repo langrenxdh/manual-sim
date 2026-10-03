@@ -11,6 +11,7 @@ public sealed class ConfigFiles
     public const string SoundFile = "engine-sound.json";
     public const string SceneFile = "scene.json";
     public const string CameraFile = "camera.json";
+    public const string FfbFile = "ffb.json";
 
     public string Directory { get; }
 

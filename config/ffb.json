@@ -1,0 +1,20 @@
+// Wheel force feedback (docs/design.md 反馈通道 / 力反馈; design.en.md Feedback channels / Force feedback).
+// Presentation only, updated at ~100 Hz on its own thread. Magnitudes are fractions of full motor force.
+// Jolts come from longitudinal jerk (rate of change of filtered acceleration), so stalls, clutch dumps
+// and hard braking all produce one without a special "stall" rule.
+{
+  "deviceNameContains": "G29",
+  "updateRateHz": 100,
+  "masterGain": 1.0,
+  "shudderMagnitude": 0.7,
+  "grindFrequencyHz": 80,
+  "grindMagnitude": 0.5,
+  "accelerationFilterHz": 15,
+  "joltThresholdMps3": 25,
+  "joltFullScaleMps3": 150,
+  "joltMagnitude": 0.8,
+  "joltLengthMs": 120,
+  "joltCooldownMs": 250,
+  "centeringSpring": 0,
+  "reconnectIntervalS": 1.0
+}

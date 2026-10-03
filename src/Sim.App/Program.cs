@@ -7,11 +7,11 @@ using static Raylib_cs.Raylib;
 // M2 drivable prototype (docs/design.md, 开发里程碑).
 // Keys: Tab tuning panel, R restart at the road start, H restart on the hill (also the right paddle),
 // F11 borderless fullscreen, Esc quit.
-// --screenshot FILE [--panel] [--hill]: save a frame after start-up and exit (checks the visuals without a
+// --screenshot FILE [--panel] [--hill] [--frames N]: save a frame after start-up and exit (checks the visuals without a
 // person); --hill also works on its own to start on the hill.
 string? screenshotPath = args.Length >= 2 && args[0] == "--screenshot" ? Path.GetFullPath(args[1]) : null;
 bool screenshotPanel = args.Contains("--panel");
-const int ScreenshotFrame = 90;
+int screenshotFrame = args.SkipWhile(a => a != "--frames").Skip(1).Select(int.Parse).FirstOrDefault(90);
 int frameCount = 0;
 
 var config = ConfigFiles.Locate();
@@ -20,6 +20,7 @@ var input = InputConfig.FromJson(config.Read(ConfigFiles.InputFile));
 var sound = SoundParams.FromJson(config.Read(ConfigFiles.SoundFile));
 var scene = Scene.FromJson(config.Read(ConfigFiles.SceneFile));
 var camera = CameraParams.FromJson(config.Read(ConfigFiles.CameraFile));
+var ffbParams = FfbParams.FromJson(config.Read(ConfigFiles.FfbFile));
 SceneView? sceneView = null;
 const float RoadViewShare = 0.72f; // road on the top ~3/4, instruments below (design doc)
 EngineSound? engineSound = null;
@@ -27,6 +28,7 @@ bool onHill = false;
 UiButtons previousButtons = default;
 
 using var physics = new PhysicsLoop(vehicle, input, scene.BuildRoad());
+using var ffb = new FfbLoop(physics.ForFfb, ffbParams);
 
 void Restart(bool hill)
 {
@@ -51,6 +53,9 @@ var panel = new TuningPanel(
     new TunableDocument("Camera", ConfigFiles.CameraFile, typeof(CameraParams),
         config.Read(ConfigFiles.CameraFile), CameraParams.FromJson,
         o => { camera = (CameraParams)o; if (sceneView != null) sceneView.Camera = camera; }),
+    new TunableDocument("Force feedback", ConfigFiles.FfbFile, typeof(FfbParams),
+        config.Read(ConfigFiles.FfbFile), FfbParams.FromJson,
+        o => ffb.Params = (FfbParams)o),
 ], config.Save) { Visible = screenshotPanel };
 
 SetConfigFlags(ConfigFlags.ResizableWindow | ConfigFlags.VSyncHint | ConfigFlags.Msaa4xHint);
@@ -76,6 +81,10 @@ while (!WindowShouldClose())
     panel.Update(panelArea, TuningPanel.ListArea(panelArea));
 
     var frame = physics.ForRender.Read();
+    var ffbStatus = ffb.Status.Read();
+    panel.ExtraReadout = ffbStatus.Connected
+        ? $"ffb {ffbStatus.RateHz:F0} Hz   calls {ffbStatus.Calls}   failed {ffbStatus.Failures}   max {ffbStatus.MaxCallMs:F1} ms   jolts {ffbStatus.Jolts}"
+        : $"ffb off: {ffbStatus.Error ?? "starting"}";
     var buttons = frame.Input.Buttons;
     if (buttons.HillStart && !previousButtons.HillStart) Restart(hill: true);
     previousButtons = buttons;
@@ -89,7 +98,7 @@ while (!WindowShouldClose())
         Ui.Text($"physics {frame.PhysicsHz:F0} Hz  overruns {frame.Overruns}   Tab: tuning panel", 8, h - 24, 18, Color.Gray);
     panel.Draw(panelArea, frame, vehicle);
 
-    if (screenshotPath != null && ++frameCount == ScreenshotFrame)
+    if (screenshotPath != null && ++frameCount == screenshotFrame)
     {
         Rlgl.DrawRenderBatchActive();
         var image = LoadImageFromScreen();

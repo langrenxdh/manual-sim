@@ -39,6 +39,7 @@ public sealed class PhysicsLoop : IDisposable
 
     public LatestValue<Frame> ForRender { get; } = new();
     public LatestValue<Frame> ForAudio { get; } = new();
+    public LatestValue<Frame> ForFfb { get; } = new();
 
     public PhysicsLoop(VehicleParams parameters, InputConfig inputConfig, Road road)
     {
@@ -105,6 +106,7 @@ public sealed class PhysicsLoop : IDisposable
                     var frame = new Frame(sim.State, sample, reader?.DeviceName, inputError, physicsHz, overruns);
                     ForRender.Publish(frame);
                     ForAudio.Publish(frame);
+                    ForFfb.Publish(frame);
                 }
 
                 if (now - windowStart >= RateWindowS * 1000)
