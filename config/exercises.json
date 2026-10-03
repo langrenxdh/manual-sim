@@ -1,0 +1,84 @@
+// Graded exercises (docs/design.md 练习与评分 / design.en.md Practice and scoring).
+// Score = 100 - sum of penalties. Per metric: no penalty at or below "good", the full "weight" at or
+// above "bad", linear in between; weights add up to 100. A stall, too much rollback or the time
+// limit fails the attempt (0 points). Calibrated against scripted driving in tests/Sim.Training.Tests
+// (jerk filtered at 3 Hz: smooth 2 s pull-away ~26 m/s^3, 80 % throttle flare ~87); tune by feel,
+// but keep those tests' intent.
+{
+  "jerkFilterHz": 3,
+  "grades": { "a": 90, "b": 75, "c": 50 },
+  "exercises": [
+    {
+      "id": "flatPullAway",
+      "name": "Flat pull-away",
+      "goal": "Pull away in 1st without stalling: smooth clutch, little throttle.",
+      "start": "roadStart",
+      "finishGear": 1,
+      "finishMinSpeedKmh": 5,
+      "finishMinDistanceM": 0,
+      "finishHoldS": 1,
+      "timeLimitS": 60,
+      "scoring": [
+        { "metric": "clutchSlipEnergyKJ", "good": 3, "bad": 30, "weight": 35 },
+        { "metric": "peakJerkMps3", "good": 30, "bad": 90, "weight": 35 },
+        { "metric": "overRevS", "good": 0, "bad": 1, "weight": 15 },
+        { "metric": "timeS", "good": 15, "bad": 45, "weight": 15 }
+      ]
+    },
+    {
+      "id": "hillStartAssist",
+      "name": "Hill start (assist)",
+      "goal": "Brake, release the handbrake, then pull away uphill 15 m before the assist lets go.",
+      "start": "hillStart",
+      "hillHold": true,
+      "finishGear": 1,
+      "finishMinSpeedKmh": 3,
+      "finishMinDistanceM": 15,
+      "finishHoldS": 1,
+      "maxRollbackM": 0.5,
+      "timeLimitS": 90,
+      "scoring": [
+        { "metric": "clutchSlipEnergyKJ", "good": 8, "bad": 30, "weight": 30 },
+        { "metric": "peakJerkMps3", "good": 35, "bad": 90, "weight": 25 },
+        { "metric": "rollbackM", "good": 0.05, "bad": 0.5, "weight": 30 },
+        { "metric": "timeS", "good": 20, "bad": 60, "weight": 15 }
+      ]
+    },
+    {
+      "id": "hillStartHandbrake",
+      "name": "Hill start (handbrake)",
+      "goal": "Assist is off: find the bite with the handbrake on, release it, pull away uphill 15 m.",
+      "start": "hillStart",
+      "hillHold": false,
+      "finishGear": 1,
+      "finishMinSpeedKmh": 3,
+      "finishMinDistanceM": 15,
+      "finishHoldS": 1,
+      "maxRollbackM": 0.5,
+      "timeLimitS": 90,
+      "scoring": [
+        { "metric": "clutchSlipEnergyKJ", "good": 8, "bad": 30, "weight": 30 },
+        { "metric": "peakJerkMps3", "good": 35, "bad": 90, "weight": 25 },
+        { "metric": "rollbackM", "good": 0.05, "bad": 0.5, "weight": 30 },
+        { "metric": "timeS", "good": 20, "bad": 60, "weight": 15 }
+      ]
+    },
+    {
+      "id": "smoothUpshifts",
+      "name": "Smooth upshifts",
+      "goal": "From rest, shift 1-2-3 and reach 40 km/h in 3rd without grinding or lurching.",
+      "start": "roadStart",
+      "finishGear": 3,
+      "finishMinSpeedKmh": 40,
+      "finishMinDistanceM": 0,
+      "finishHoldS": 1,
+      "timeLimitS": 90,
+      "scoring": [
+        { "metric": "clutchSlipEnergyKJ", "good": 12, "bad": 40, "weight": 30 },
+        { "metric": "peakJerkMps3", "good": 50, "bad": 120, "weight": 30 },
+        { "metric": "grindingS", "good": 0, "bad": 0.5, "weight": 25 },
+        { "metric": "timeS", "good": 30, "bad": 60, "weight": 15 }
+      ]
+    }
+  ]
+}

@@ -3,9 +3,11 @@
     <Project Path="src/Sim.App/Sim.App.csproj" />
     <Project Path="src/Sim.Core/Sim.Core.csproj" />
     <Project Path="src/Sim.Input/Sim.Input.csproj" />
+    <Project Path="src/Sim.Training/Sim.Training.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Sim.Core.Tests/Sim.Core.Tests.csproj" />
+    <Project Path="tests/Sim.Training.Tests/Sim.Training.Tests.csproj" />
   </Folder>
   <Folder Name="/tools/">
     <Project Path="tools/HwProbe/HwProbe.csproj" />

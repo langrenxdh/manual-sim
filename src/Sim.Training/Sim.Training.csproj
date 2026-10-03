@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Graded exercises and scoring. Pure like Sim.Core: no IO, threads, clocks or devices,
+       so it runs identically on the physics thread and in Linux tests (docs/engineering-rules.en.md). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Sim.Training</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Sim.Core\Sim.Core.csproj" />
+  </ItemGroup>
+
+</Project>
