@@ -15,6 +15,8 @@ int frameCount = 0;
 var config = ConfigFiles.Locate();
 var vehicle = VehicleParams.FromJson(config.Read(ConfigFiles.VehicleFile));
 var input = InputConfig.FromJson(config.Read(ConfigFiles.InputFile));
+var sound = SoundParams.FromJson(config.Read(ConfigFiles.SoundFile));
+EngineSound? engineSound = null;
 double grade = 0;
 
 using var physics = new PhysicsLoop(vehicle, input);
@@ -27,6 +29,9 @@ var panel = new TuningPanel(
     new TunableDocument("Input", ConfigFiles.InputFile, typeof(InputConfig),
         config.Read(ConfigFiles.InputFile), InputConfig.FromJson,
         o => physics.SubmitInputConfig((InputConfig)o)),
+    new TunableDocument("Sound", ConfigFiles.SoundFile, typeof(SoundParams),
+        config.Read(ConfigFiles.SoundFile), SoundParams.FromJson,
+        o => { sound = (SoundParams)o; if (engineSound != null) engineSound.Params = sound; }),
     new TunableDocument("Scenario (changing it restarts the car)", null, typeof(Scenario),
         """{ "gradePercent": 0 }""", Scenario.FromJson,
         o => physics.Reset(grade = ((Scenario)o).GradePercent / 100)),
@@ -36,6 +41,8 @@ SetConfigFlags(ConfigFlags.ResizableWindow | ConfigFlags.VSyncHint | ConfigFlags
 InitWindow(1600, 900, "Manual Sim - " + vehicle.Name);
 SetTargetFPS(60);
 Ui.Load();
+engineSound = EngineSound.Start(physics.ForAudio, sound);
+if (engineSound == null) Console.Error.WriteLine("No audio device: running without engine sound.");
 
 while (!WindowShouldClose())
 {
@@ -71,5 +78,6 @@ while (!WindowShouldClose())
     EndDrawing();
 }
 
+engineSound?.Dispose();
 Ui.Unload();
 CloseWindow();

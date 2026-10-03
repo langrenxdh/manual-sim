@@ -272,14 +272,14 @@ public sealed class TuningPanel
 
     private static void AddArray(List<Row> rows, TunableDocument d, JsonArray arr, Type? type, string path, int depth)
     {
-        bool curve = type == typeof(Curve);
         var elementType = type?.IsArray == true ? type.GetElementType() : null;
         for (int i = 0; i < arr.Count; i++)
         {
-            if (curve && arr[i] is JsonArray pair && pair.Count == 2)
+            if (arr[i] is JsonArray pair && pair.Count == 2)
             {
-                // Curve points: x is the breakpoint (kept fixed so x stays increasing), y is tuned.
-                rows.Add(new Row($"{path}/{i}", depth, $"at {pair[0]!.ToJsonString()}", Kind.CurvePoint, d, pair, null, 1));
+                // [x, y] pairs (curves, harmonics): x is the key, kept fixed so curves stay increasing; y is tuned.
+                string label = type == typeof(Curve) ? $"at {pair[0]!.ToJsonString()}" : $"[{pair[0]!.ToJsonString()}]";
+                rows.Add(new Row($"{path}/{i}", depth, label, Kind.CurvePoint, d, pair, null, 1));
             }
             else if (arr[i] is JsonValue v)
             {

@@ -1,0 +1,21 @@
+// Synthesised engine sound (docs/design.md, 反馈通道 / 声音). Not physics: these only shape what the
+// physics state sounds like. Firing frequency = rpm / 60 * 2 (4-cylinder, 4-stroke).
+// harmonics: [order, gain] relative to the firing frequency. The fundamental (27 Hz at idle) is below
+// what PC speakers play, so energy sits in orders 2-8 and the ear fills in the missing fundamental.
+{
+  "masterGain": 0.7,
+  "harmonics": [[1, 0.15], [2, 1.0], [3, 0.55], [4, 0.45], [5, 0.25], [6, 0.2], [7, 0.12], [8, 0.08]],
+  "loadReferenceNm": 250,
+  "idleLoudness": 0.45,
+  "loadLoudness": 0.55,
+  "loadBrightness": 0.8,
+  "lugModulationDepth": 0.7,
+  "lugMinOrder": 3,
+  "notFiringGain": 0.25,
+  "audibleFromRpm": 150,
+  "turboGain": 0.12,
+  "turboCutoffHz": 1800,
+  "starterGain": 0.25,
+  "starterFrequencyHz": 140,
+  "parameterSmoothingS": 0.02
+}
