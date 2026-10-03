@@ -49,7 +49,7 @@ public sealed class PhysicsLoop : IDisposable
     private ResetRequest? _pendingReset;
 
     private sealed record ResetRequest(Road Road, double PositionM, bool EngageHandbrake,
-        ExerciseConfig? Exercises, ExerciseDef? Exercise);
+        ExerciseConfig? Exercises, ExerciseDef? Exercise, Scene? Scene);
 
     // Physics-thread state for graded exercises (null in free driving).
     private ExerciseConfig? _exercises;
@@ -82,15 +82,15 @@ public sealed class PhysicsLoop : IDisposable
     /// is usually engaged so the car does not roll back before the driver reacts.
     /// </summary>
     public void Reset(Road road, double positionM, bool engageHandbrake) =>
-        Volatile.Write(ref _pendingReset, new ResetRequest(road, positionM, engageHandbrake, null, null));
+        Volatile.Write(ref _pendingReset, new ResetRequest(road, positionM, engageHandbrake, null, null, null));
 
     /// <summary>
     /// Restarts the car for a new attempt at an exercise. The physics runs with the exercise's
     /// hill-assist setting and every step is scored until the attempt ends. Free driving resumes
     /// with the next plain <see cref="Reset"/>.
     /// </summary>
-    public void StartExercise(Road road, double positionM, bool engageHandbrake, ExerciseConfig exercises, ExerciseDef exercise) =>
-        Volatile.Write(ref _pendingReset, new ResetRequest(road, positionM, engageHandbrake, exercises, exercise));
+    public void StartExercise(Scene scene, double positionM, bool engageHandbrake, ExerciseConfig exercises, ExerciseDef exercise) =>
+        Volatile.Write(ref _pendingReset, new ResetRequest(scene.BuildRoad(), positionM, engageHandbrake, exercises, exercise, scene));
 
     private void Run()
     {
@@ -177,7 +177,7 @@ public sealed class PhysicsLoop : IDisposable
         _exercises = r.Exercises;
         _exercise = r.Exercise;
         var vehicle = Effective();
-        _session = _exercises != null && _exercise != null ? new ExerciseSession(_exercises, _exercise, vehicle) : null;
+        _session = _exercises != null && _exercise != null ? new ExerciseSession(_exercises, _exercise, vehicle, r.Scene) : null;
         _attemptId++;
         return new Simulator(vehicle, r.Road, positionM: r.PositionM);
     }

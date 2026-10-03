@@ -1,6 +1,7 @@
 using System.Numerics;
 using Raylib_cs;
 using Sim.Core;
+using Sim.Training;
 using static Raylib_cs.Raylib;
 
 namespace Sim.App;

@@ -88,7 +88,7 @@ void StartExercise(ExerciseDef e)
     activeExercise = e;
     bool hill = e.Start == StartPoint.HillStart;
     onHill = hill;
-    physics.StartExercise(scene.BuildRoad(), hill ? scene.HillStartPositionM : 0, engageHandbrake: hill, exercises, e);
+    physics.StartExercise(scene, scene.PositionOf(e.Start), engageHandbrake: hill, exercises, e);
 }
 
 // R / H / right paddle retry the current exercise; in free driving they are the two restarts.

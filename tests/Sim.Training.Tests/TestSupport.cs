@@ -8,27 +8,33 @@ internal static class Configs
 
     public static ExerciseConfig Exercises() => ExerciseConfig.FromJson(Read("exercises.json"));
 
+    public static Scene Scene() => Training.Scene.FromJson(Read("scene.json"));
+
     private static string Read(string name) => File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "config", name));
 }
 
-/// <summary>Runs one scripted attempt the way the app does: simulator step, then session observe.</summary>
+/// <summary>
+/// Runs one scripted attempt the way the app does: on the real scene's road from the exercise's start
+/// point, simulator step, then session observe.
+/// </summary>
 internal static class Attempt
 {
-    /// <summary>The scene's hill (config/scene.json) is a 10 % grade where hill starts begin.</summary>
-    public const double HillGrade = 0.10;
+    public static ExerciseSession Run(string exerciseId, Func<double, DriverInput> driver, double maxSeconds = 160) =>
+        Run(exerciseId, (t, _) => driver(t), maxSeconds);
 
-    public static ExerciseSession Run(string exerciseId, Func<double, DriverInput> driver, double maxSeconds = 120)
+    /// <summary>A driver that reacts to the car (position, speed, ...), for closed-loop scripts.</summary>
+    public static ExerciseSession Run(string exerciseId, Func<double, SimState, DriverInput> driver, double maxSeconds = 160)
     {
         var config = Configs.Exercises();
+        var scene = Configs.Scene();
         var exercise = config.Find(exerciseId);
         var vehicle = ExerciseSession.ApplyTo(exercise, Configs.Golf());
-        var road = exercise.Start == StartPoint.HillStart ? Road.Constant(HillGrade) : Road.Flat();
-        var sim = new Simulator(vehicle, road);
-        var session = new ExerciseSession(config, exercise, vehicle);
+        var sim = new Simulator(vehicle, scene.BuildRoad(), positionM: scene.PositionOf(exercise.Start));
+        var session = new ExerciseSession(config, exercise, vehicle, scene);
         int steps = (int)(maxSeconds / Simulator.StepS);
         for (int i = 0; i < steps && session.Phase == AttemptPhase.Running; i++)
         {
-            var input = driver(i * Simulator.StepS);
+            var input = driver(i * Simulator.StepS, sim.State);
             sim.Step(input);
             session.Observe(sim.State, input, Simulator.StepS);
         }

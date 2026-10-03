@@ -20,7 +20,7 @@
 
   <!-- Tests score with the real shipped configs. -->
   <ItemGroup>
-    <None Include="..\..\config\golf-110tsi.json;..\..\config\exercises.json" Link="config\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\config\golf-110tsi.json;..\..\config\exercises.json;..\..\config\scene.json" Link="config\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

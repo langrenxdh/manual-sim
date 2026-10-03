@@ -30,7 +30,10 @@ public class ScorerTests
     public void ShippedConfig_IsValid_AndEveryExerciseWeighsTo100()
     {
         var config = Configs.Exercises();
-        Assert.Equal(4, config.Exercises.Length);
+        Assert.Equal(
+            ["flatPullAway", "hillStartAssist", "hillStartHandbrake", "smoothUpshifts",
+             "trafficQueue", "stopAndHillStart", "downhill", "reverseUphill", "revMatchDownshift"],
+            config.Exercises.Select(e => e.Id));
         Assert.All(config.Exercises, e => Assert.Equal(100, e.Scoring.Sum(s => s.Weight), 9));
     }
 

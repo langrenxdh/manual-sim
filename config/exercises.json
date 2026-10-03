@@ -7,6 +7,10 @@
 // more than divergencePedalGap of its travel for divergenceHoldS) and the progress view windows.
 {
   "jerkFilterHz": 3,
+  "pedalPressedAbove": 0.1,
+  "coastingMinSpeedKmh": 5,
+  "coastingMaxEngagement": 0.5,
+  "stoppedBelowKmh": 0.5,
   "grades": { "a": 90, "b": 75, "c": 50 },
   "coaching": { "divergencePedalGap": 0.15, "divergenceHoldS": 0.2, "recentAttempts": 5, "trendAttempts": 10 },
   "exercises": [
@@ -80,6 +84,104 @@
         { "metric": "peakJerkMps3", "good": 50, "bad": 120, "weight": 30 },
         { "metric": "grindingS", "good": 0, "bad": 0.5, "weight": 25 },
         { "metric": "timeS", "good": 30, "bad": 60, "weight": 15 }
+      ]
+    },
+    {
+      "id": "trafficQueue",
+      "name": "Traffic queue",
+      "goal": "Follow the car ahead through stop-and-go traffic: not too close, not too far, no lurching.",
+      "start": "roadStart",
+      "finishGear": 1,
+      "finishMinSpeedKmh": 0,
+      "finishMinDistanceM": 0,
+      "finishHoldS": 1,
+      "timeLimitS": 90,
+      "lead": {
+        "startGapM": 3,
+        "minGapM": 0.5,
+        "bandMinM": 1.5,
+        "bandMaxM": 8,
+        "frontAheadOfDriverM": 2.2,
+        "speedProfile": [[0, 0], [3, 0], [5, 10], [9, 10], [11, 0], [16, 0], [18, 12], [24, 12], [27, 0], [32, 0]]
+      },
+      "scoring": [
+        { "metric": "gapOutsideBandS", "good": 2, "bad": 15, "weight": 35 },
+        { "metric": "clutchSlipEnergyKJ", "good": 8, "bad": 40, "weight": 30 },
+        { "metric": "peakJerkMps3", "good": 40, "bad": 100, "weight": 35 }
+      ]
+    },
+    {
+      "id": "stopAndHillStart",
+      "name": "Stop on the line, pull away",
+      "goal": "Drive to the hill, stop with the front just before the line, then pull away uphill.",
+      "start": "roadStart",
+      "finishGear": 1,
+      "finishMinSpeedKmh": 3,
+      "finishMinDistanceM": 15,
+      "finishHoldS": 1,
+      "maxRollbackM": 0.5,
+      "timeLimitS": 150,
+      "stopLine": { "frontAheadOfDriverM": 2.2, "idealGapM": 0.5, "overrunToleranceM": 0.5, "stopHoldS": 1, "countsWithinM": 10 },
+      "scoring": [
+        { "metric": "stopErrorM", "good": 0.5, "bad": 3, "weight": 25 },
+        { "metric": "rollbackM", "good": 0.05, "bad": 0.5, "weight": 25 },
+        { "metric": "clutchSlipEnergyKJ", "good": 15, "bad": 50, "weight": 25 },
+        { "metric": "peakJerkMps3", "good": 60, "bad": 120, "weight": 25 }
+      ]
+    },
+    {
+      "id": "downhill",
+      "name": "Downhill",
+      "goal": "Drive down the hill below 50 km/h in a low gear: engine braking, little foot brake, no coasting.",
+      "start": "plateauStart",
+      "finishGear": 2,
+      "finishMinSpeedKmh": 5,
+      "finishMinDistanceM": 290,
+      "finishHoldS": 0.5,
+      "timeLimitS": 150,
+      "speedLimitKmh": 50,
+      "scoring": [
+        { "metric": "overSpeedS", "good": 1, "bad": 10, "weight": 35 },
+        { "metric": "brakeS", "good": 3, "bad": 20, "weight": 25 },
+        { "metric": "coastingS", "good": 1, "bad": 8, "weight": 25 },
+        { "metric": "timeS", "good": 60, "bad": 120, "weight": 15 }
+      ]
+    },
+    {
+      "id": "reverseUphill",
+      "name": "Reverse uphill",
+      "goal": "The slope rises behind you: reverse 20 m up it without rolling forward.",
+      "start": "downhillBottom",
+      "direction": "reverse",
+      "finishGear": -1,
+      "finishMinSpeedKmh": 1,
+      "finishMinDistanceM": 20,
+      "finishHoldS": 1,
+      "maxRollbackM": 0.5,
+      "timeLimitS": 90,
+      "scoring": [
+        { "metric": "rollbackM", "good": 0.05, "bad": 0.5, "weight": 30 },
+        { "metric": "clutchSlipEnergyKJ", "good": 10, "bad": 35, "weight": 30 },
+        { "metric": "peakJerkMps3", "good": 35, "bad": 90, "weight": 25 },
+        { "metric": "timeS", "good": 30, "bad": 60, "weight": 15 }
+      ]
+    },
+    {
+      "id": "revMatchDownshift",
+      "name": "Rev-matched downshift",
+      "goal": "Reach 45 km/h in 3rd, then shift down to 2nd with a throttle blip so the car doesn't lurch.",
+      "start": "roadStart",
+      "finishGear": 2,
+      "finishMinSpeedKmh": 20,
+      "finishMinDistanceM": 0,
+      "finishHoldS": 1,
+      "timeLimitS": 90,
+      "downshift": { "fromGear": 3, "minSpeedKmh": 45, "toGear": 2, "biteEngagement": 0.1 },
+      "scoring": [
+        { "metric": "revMatchErrorRpm", "good": 300, "bad": 2000, "weight": 40 },
+        { "metric": "downshiftJerkMps3", "good": 30, "bad": 100, "weight": 30 },
+        { "metric": "grindingS", "good": 0, "bad": 0.5, "weight": 15 },
+        { "metric": "timeS", "good": 40, "bad": 80, "weight": 15 }
       ]
     }
   ]
