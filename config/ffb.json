@@ -1,7 +1,8 @@
 // Wheel force feedback (docs/design.md 反馈通道 / 力反馈; design.en.md Feedback channels / Force feedback).
 // Presentation only, updated at ~100 Hz on its own thread. Magnitudes are fractions of full motor force.
 // Jolts come from longitudinal jerk (rate of change of filtered acceleration), so stalls, clutch dumps
-// and hard braking all produce one without a special "stall" rule.
+// and hard braking all produce one without a special "stall" rule. On the town map (steering on, M9) the
+// wheel is also pushed by the physics aligning torque (steeringFullScaleNm = full motor force) plus a damper.
 {
   "deviceNameContains": "G29",
   "updateRateHz": 100,
@@ -16,5 +17,9 @@
   "joltLengthMs": 120,
   "joltCooldownMs": 250,
   "centeringSpring": 0,
-  "reconnectIntervalS": 1.0
+  "reconnectIntervalS": 1.0,
+  "steeringFullScaleNm": 3.0,
+  "steeringGain": 1.0,
+  "steeringDamperPerDegPerS": 0.0003,
+  "steeringRateFilterHz": 10
 }

@@ -21,6 +21,11 @@ public sealed class FfbLoop : IDisposable
 
     public LatestValue<FfbStatus> Status { get; } = new();
 
+    private volatile bool _steeringAxisInverted;
+
+    /// <summary>From the input config: the raw wheel axis decreases as the wheel turns left.</summary>
+    public bool SteeringAxisInverted { get => _steeringAxisInverted; set => _steeringAxisInverted = value; }
+
     public FfbParams Params
     {
         get => Volatile.Read(ref _params);
@@ -42,6 +47,7 @@ public sealed class FfbLoop : IDisposable
         var clock = Stopwatch.StartNew();
         double lastS = 0, sinceRetryS = double.MaxValue, rateWindowS = 0, lastJoltS = double.MinValue;
         double filteredAccel = 0, previousFiltered = 0, rateHz = 0;
+        double previousWheelDeg = 0, wheelRateDegPerS = 0;
         long ticks = 0, jolts = 0;
         bool primed = false;
         double nextTickS = 0;
@@ -79,6 +85,10 @@ public sealed class FfbLoop : IDisposable
                 filteredAccel += (f.State.AccelerationMps2 - filteredAccel) * alpha;
                 double jerk = primed ? (filteredAccel - previousFiltered) / dt : 0;
                 previousFiltered = filteredAccel;
+                double wheelDeg = f.Input.Input.SteeringWheelDeg;
+                double rateAlpha = 1 - Math.Exp(-2 * Math.PI * p.SteeringRateFilterHz * dt);
+                wheelRateDegPerS += ((primed ? (wheelDeg - previousWheelDeg) / dt : 0) - wheelRateDegPerS) * rateAlpha;
+                previousWheelDeg = wheelDeg;
                 primed = true;
 
                 if (wheel != null)
@@ -89,6 +99,16 @@ public sealed class FfbLoop : IDisposable
                     double firingHz = Math.Max(0, s.EngineRpm) / 60 * 2;
                     wheel.SetShudder(firingHz, s.Firing ? s.ShudderIntensity * p.ShudderMagnitude : 0);
                     wheel.SetGrind(p.GrindFrequencyHz, s.Grinding ? p.GrindMagnitude : 0);
+                    // Steering (town map): aligning torque plus damping, in the sim's sign convention
+                    // (positive = towards a left turn), then onto the raw axis direction.
+                    double? steer = null;
+                    if (s.Steering)
+                    {
+                        double level = s.AligningTorqueNm / p.SteeringFullScaleNm * p.SteeringGain
+                                       - p.SteeringDamperPerDegPerS * wheelRateDegPerS;
+                        steer = Math.Clamp(level, -1, 1) * (SteeringAxisInverted ? -1 : 1);
+                    }
+                    wheel.SetSteeringForce(steer);
                     if (Math.Abs(jerk) > p.JoltThresholdMps3 && (now - lastJoltS) * 1000 >= p.JoltCooldownMs)
                     {
                         double level = Math.Min(1, Math.Abs(jerk) / p.JoltFullScaleMps3) * p.JoltMagnitude;

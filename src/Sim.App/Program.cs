@@ -62,7 +62,7 @@ bool onTown = false; // free driving on the town map with steering (M9)
 UiButtons previousButtons = default;
 
 using var physics = new PhysicsLoop(vehicle, input, scene.BuildRoad());
-using var ffb = new FfbLoop(physics.ForFfb, ffbParams);
+using var ffb = new FfbLoop(physics.ForFfb, ffbParams) { SteeringAxisInverted = input.Steering.Inverted };
 using var telemetry = new TelemetryWriter(physics.ForTelemetry,
     Path.Combine(dataRoot, "telemetry"));
 bool replayOpen = false;
@@ -171,7 +171,11 @@ var panel = new TuningPanel(
     VehicleDocument(carFile),
     new TunableDocument("Input", ConfigFiles.InputFile, typeof(InputConfig),
         config.Read(ConfigFiles.InputFile), InputConfig.FromJson,
-        o => physics.SubmitInputConfig((InputConfig)o)),
+        o =>
+        {
+            physics.SubmitInputConfig((InputConfig)o);
+            ffb.SteeringAxisInverted = ((InputConfig)o).Steering.Inverted;
+        }),
     new TunableDocument("Sound", ConfigFiles.SoundFile, typeof(SoundParams),
         config.Read(ConfigFiles.SoundFile), SoundParams.FromJson,
         o => { sound = (SoundParams)o; if (engineSound != null) engineSound.Params = sound; }),

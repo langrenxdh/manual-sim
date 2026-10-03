@@ -6,15 +6,15 @@ namespace Sim.Input;
 
 /// <summary>
 /// G29 wheel motor through SDL3 haptics: a continuously updated sine (engine judder), a second sine
-/// switched on and off (gear grinding), short constant-force pulses (jolts) and an optional
-/// centering spring. Create, use and dispose it on one thread (the force-feedback thread); it opens
+/// switched on and off (gear grinding), short constant-force pulses (jolts), an optional
+/// centering spring and a continuously updated constant force for steering (M9). Create, use and dispose it on one thread (the force-feedback thread); it opens
 /// the haptic device by name, independently of the joystick the physics thread polls.
 /// </summary>
 public sealed unsafe class ForceFeedback : IDisposable
 {
     private readonly SDL_Haptic* _haptic;
-    private readonly SDL_HapticEffectID _shudder, _grind, _jolt, _spring;
-    private bool _shudderRunning, _grindRunning, _springRunning;
+    private readonly SDL_HapticEffectID _shudder, _grind, _jolt, _spring, _steer;
+    private bool _shudderRunning, _grindRunning, _springRunning, _steerRunning;
 
     public string Name { get; }
     public long Calls { get; private set; }
@@ -35,9 +35,11 @@ public sealed unsafe class ForceFeedback : IDisposable
         _grind = SDL_CreateHapticEffect(haptic, &grind);
         var jolt = Constant(0, 100);
         _jolt = SDL_CreateHapticEffect(haptic, &jolt);
+        var steer = Constant(0, SDL_HAPTIC_INFINITY);
+        _steer = SDL_CreateHapticEffect(haptic, &steer);
         var spring = Spring(0);
         _spring = (features & SDL_HAPTIC_SPRING) != 0 ? SDL_CreateHapticEffect(haptic, &spring) : (SDL_HapticEffectID)(-1);
-        if ((int)_shudder < 0 || (int)_grind < 0 || (int)_jolt < 0)
+        if ((int)_shudder < 0 || (int)_grind < 0 || (int)_jolt < 0 || (int)_steer < 0)
             throw new InvalidOperationException($"Creating haptic effects failed: {SDL_GetError()}");
     }
 
@@ -98,6 +100,27 @@ public sealed unsafe class ForceFeedback : IDisposable
         var e = Constant(level, lengthMs);
         long t = Stopwatch.GetTimestamp();
         Done(t, SDL_UpdateHapticEffect(_haptic, _jolt, &e) && SDL_RunHapticEffect(_haptic, _jolt, 1));
+    }
+
+    /// <summary>
+    /// Steering force, level -1..1 on the raw axis direction (positive moves the raw axis value up);
+    /// null stops it.
+    /// </summary>
+    public void SetSteeringForce(double? level)
+    {
+        bool on = level != null;
+        if (on)
+        {
+            var e = Constant(level!.Value, SDL_HAPTIC_INFINITY);
+            long t = Stopwatch.GetTimestamp();
+            Done(t, SDL_UpdateHapticEffect(_haptic, _steer, &e));
+        }
+        if (on != _steerRunning)
+        {
+            long t = Stopwatch.GetTimestamp();
+            Done(t, on ? SDL_RunHapticEffect(_haptic, _steer, 1) : SDL_StopHapticEffect(_haptic, _steer));
+            _steerRunning = on;
+        }
     }
 
     /// <summary>Centering spring, coefficient 0..1; 0 (or no spring support) turns it off.</summary>
