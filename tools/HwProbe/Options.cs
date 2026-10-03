@@ -6,7 +6,8 @@ internal sealed record Options(
     string? CsvPath,
     bool? Lg4ff,
     double StepSeconds,
-    bool SweepOnly)
+    bool SweepOnly,
+    double Seconds = 0)
 {
     public static Options? Parse(string[] args)
     {
@@ -16,6 +17,7 @@ internal sealed record Options(
         bool? lg4ff = null;
         double step = 2.0;
         bool sweepOnly = false;
+        double seconds = 0;
 
         int i = 0;
         if (args.Length > 0 && !args[0].StartsWith('-'))
@@ -23,7 +25,7 @@ internal sealed record Options(
             command = args[0];
             i = 1;
         }
-        if (command is not ("list" or "watch" or "ffb")) return null;
+        if (command is not ("list" or "watch" or "ffb" or "steer")) return null;
 
         for (; i < args.Length; i++)
         {
@@ -37,13 +39,15 @@ internal sealed record Options(
                     lg4ff = args[++i] == "on"; break;
                 case "--step" when i + 1 < args.Length && double.TryParse(args[i + 1], out double s) && s > 0:
                     step = s; i++; break;
+                case "--seconds" when i + 1 < args.Length && double.TryParse(args[i + 1], out double sec) && sec > 0:
+                    seconds = sec; i++; break;
                 case "--sweep-only":
                     sweepOnly = true; break;
                 default:
                     return null;
             }
         }
-        return new Options(command, device, csv, lg4ff, step, sweepOnly);
+        return new Options(command, device, csv, lg4ff, step, sweepOnly, seconds);
     }
 
     public static void PrintUsage()
@@ -56,6 +60,8 @@ internal sealed record Options(
               HwProbe watch [--csv FILE]        live raw axes / buttons / hats (default command)
               HwProbe ffb [--step SECONDS] [--sweep-only]
                                                 sine sweep, then interactive force-feedback test
+              HwProbe steer [--seconds N]       M9a: centring torque that follows the wheel angle at 100 Hz,
+                                                with the judder sine on top
 
             common options:
               --device N        use joystick N from `list` (default: first Logitech device, else first)

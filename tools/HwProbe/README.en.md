@@ -45,6 +45,10 @@ Hold the wheel lightly. First an automatic sweep of 18 steps (2 s each); rate ea
 By default SDL lets its HIDAPI LG4FF driver take over the G29. Use `--lg4ff off` to switch to DirectInput (G HUB driver) and run
 `list` and `ffb` again to compare which backend works and whether the feel differs.
 
+### 5. Steering force feedback (M9a): `HwProbe steer`
+
+The wheel is pulled back to centre by a force that follows its angle (a virtual spring plus damper), with a light judder on top. Turn the wheel and feel whether the centring force is smooth, with no steps; turn to full lock and let go, and see that it settles at the centre without oscillating. Once a second it prints the update rate (should be about 100 Hz), failures (should be 0) and the slowest call. Press `q` to quit.
+
 ## Report template
 
 ```

@@ -19,5 +19,6 @@ return opts.Command switch
     "list" => ListCommand.Run(),
     "watch" => WatchCommand.Run(opts, cancel.Token),
     "ffb" => FfbCommand.Run(opts, cancel.Token),
+    "steer" => SteerCommand.Run(opts, cancel.Token),
     _ => 2,
 };
