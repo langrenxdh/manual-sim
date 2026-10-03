@@ -276,7 +276,7 @@ M2 uses 2D instruments instead of a 3D scene so the feet can get on the pedals a
 
 ## M3 decision record
 
-2026-10-03, implemented locally. The gate "hill-start feel accepted" is pending my check on the G29; the result goes here.
+2026-10-03, implemented locally. **Gate reached, v1 complete**: every hill start tried on the G29 (with hill-start assist, and without it using the handbrake), feel accepted.
 
 | # | Decision | Reason |
 | --- | --- | --- |
@@ -290,3 +290,4 @@ M2 uses 2D instruments instead of a 3D scene so the feet can get on the pedals a
 | F8 | Teaching mode: left, the clutch curve with the bite zone and the foot position; right, stall margin, idle-control usage, hill-hold state and remaining time. Sim.Core's `Clutch` became public (no behaviour change) so the overlay draws the curve the physics uses | No duplicated formula that could drift |
 | F9 | Shift suggestion: with the clutch locked and the engine firing, ↑ above 2500 rpm and ↓ below 1200 rpm (`scene.json`, dashboard section), shown in both modes | Thresholds are estimates; tune to the real car's indicator |
 | F10 | First-time setup: enter the visible screen width and viewing distance; the road view's vertical FOV = the angle its real height on the screen subtends at the eye. Speaker calibration is a 25 s logarithmic 20–250 Hz sweep. Harmonics below the speaker limit drop to 20 % and 60 % of the removed energy goes to the next two harmonics. Results go to `config/setup.json` (not in git); defaults in `setup.example.json` | Design doc: compute the FOV so the sense of speed is not trained wrong; speakers cannot play low frequencies. A true FOV on an ordinary monitor is narrow (about 16° for 60 cm wide at 70 cm), so the view looks more "zoomed in" than games; this is intentional |
+| F11 | Pressing O (or T) while the replay is open closes the replay and turns teaching mode on, instead of toggling it underneath | Found in testing: after opening the replay with triangle, O seemed to do nothing because the replay covered the teaching overlays |
