@@ -101,6 +101,8 @@ Split into steps, each with its own gate:
 
 ### M10 — Sharing (idea 15; needs your decision to lift hard rule 5)
 
+**Status: package and Chinese UI implemented (2026-10-03), see the M10 decision record in the design doc; the input wizard waits for the decision on hard rule 5.**
+
 - Installer (self-contained .NET publish + config and setup on first run).
 - Input setup wizard for other wheels and pedals: detect axes and buttons by asking the user to press each one (generalising `HwProbe watch`), write a `config/<device>.json`; force feedback optional.
 - Chinese/English UI: string tables, font with CJK glyphs.

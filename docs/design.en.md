@@ -439,3 +439,15 @@ The milestones after M4 (M5–M10: coaching, more exercises, fidelity and other 
 | N8 | Town exercises: roundabout (clockwise via the west side, out of the east exit in 2nd or higher), car-park bay (2nd bay from the left, nose in within 10°, stopped), three-point turn (in the dead end, pointing south within 15°, moving in 1st). New metric `offRoadS`: time with any corner of the car's outline (`townCar` in `exercises.json`) off the road. `via` areas must be passed in order; the finish zone needs the whole car inside and is drawn in yellow | "Line keeping" is judged as time off the road; goals only judge, never act on the car |
 | N9 | Tests: T12–T16 for steering physics, town map geometry tests, and S11–S13 with pure-pursuit scripted drivers: roundabout 100, anticlockwise shortcut never finishes; bay 97, wrong bay never finishes; three-point turn 86 when careful, 51 over the kerbs | As before, the tests pin the intent; `exercises.json` is tuned by feel |
 | N10 | Not in M9: giving way to other traffic at the roundabout, collisions and kerb physics, camera lag on turning | Out of scope for now; leaving the road is only judged |
+
+## M10 decision record (sharing)
+
+2026-10-03, partly implemented locally: the package and the Chinese UI. The input setup wizard for other wheels is **not** built: it exists only to support hardware other than the G29, which hard rule 5 rules out until I decide to lift it.
+
+| # | Decision | Reason |
+| --- | --- | --- |
+| P1 | `scripts/publish.ps1` makes a self-contained win-x64 package (`publish/ManualSim/`, `ManualSim.exe` + `config/`, about 38 MB zipped) with the install guide `docs/install(.en).md`. `config/setup.json` is left out so first-time setup runs on the new PC; scores and telemetry are created next to `config/` | No .NET install, unzip and run; nothing personal or machine-specific is shipped |
+| P2 | The UI text stays English in code. `Ui` translates every string it draws or measures through a table, `config/strings.zh.json` (English → Chinese, `{0}` placeholders for numbers and names; lines split by three spaces are translated part by part; nested parts such as failure reasons are translated too). Missing entries stay English. The tuning panel stays English | One mechanism for every screen with almost no changes to drawing code; exercise names and goals come from `exercises.json` and are translated the same way |
+| P3 | In Chinese the font is DengXian (`Deng.ttf`, falling back to SimHei), loaded with ASCII plus exactly the characters used in the table. Spoken cues use a Chinese voice when Windows has one | A full CJK atlas would be huge; the table defines what can appear |
+| P4 | L switches the language and saves it in `config/ui.json`; `--language zh|en` overrides it for one run | The choice survives restarts |
+| P5 | Not done: the input wizard (needs hard rule 5 lifted), and the gate "a friend installs it and drives without help", which needs a friend | Waiting for my decision and a test |
