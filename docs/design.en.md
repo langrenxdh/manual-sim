@@ -151,6 +151,33 @@ Immersion mode is the default; a wheel button switches to teaching mode at any t
 
 **Telemetry is always recorded in the background**, regardless of mode: all inputs and model state at 1 kHz. In immersion mode, after a stall, the replay button on the wheel shows the last ten seconds of pedals, rpm and speed, so you can see exactly when you released too fast. The same telemetry is used for tuning and automated tests.
 
+## Practice and scoring
+
+Both ways of using it: **free driving** (drive as you like, as in v1) and **graded exercises**. An exercise only chooses the start state (position, gear, speed, handbrake) and whether hill-start assist is on; it never changes the physics. Scores are computed from the physics state of every step — the same data the replay uses.
+
+| # | Exercise | Start | Completed when | Fails when |
+| --- | --- | --- | --- | --- |
+| X1 | Flat pull-away | Road start, stopped, neutral, idling | In 1st, clutch locked for 1 s, ≥ 5 km/h | Stall |
+| X2 | Hill start (assist) | 6 m before the stop line, handbrake on, assist on | 15 m driven uphill, clutch locked | Stall, or rolls back more than 0.5 m |
+| X3 | Hill start (handbrake) | Same, assist **off** | Same | Same |
+| X4 | Smooth upshifts | Road start, stopped | In 3rd, clutch locked, ≥ 40 km/h | Stall |
+
+**Metrics** (per attempt, computed every step at 1 kHz):
+
+| Metric | What it catches | How |
+| --- | --- | --- |
+| Stalls | The main failure | Combustion stops below the stall threshold (same rule as the replay). Any stall fails the attempt with 0 points |
+| Clutch slip energy (kJ) | Riding the clutch, too many revs while slipping | ∫ \|clutch torque × slip angular speed\| dt — the heat the clutch absorbs |
+| Peak jerk (m/s³) | Lurches: dumped clutch, harsh shifts | Longitudinal acceleration low-passed at 15 Hz, then the peak rate of change |
+| Rollback (m) | Rolling back on hill starts | Furthest distance behind the start position (X2, X3) |
+| Grinding (s) | Selecting a gear without the clutch fully down | Time with `Grinding` true |
+| Over-rev (s) | Flaring into the red zone | Time above the redline start |
+| Time (s) | Dawdling | Penalised only beyond a generous par time; rushing is never rewarded |
+
+**Score** = 100 − sum of penalties. Each metric has a "good" value (no penalty), a "bad" value (full penalty) and a weight; the penalty grows linearly in between and the weights add up to 100. Grades: A ≥ 90, B ≥ 75, C ≥ 50, otherwise D. Each exercise has its own table in `config/exercises.json`, tunable in the panel. Initial values are calibrated with scripted driving: a T1-style flat pull-away with a 2 s clutch release must score at least a B.
+
+Each attempt is appended to `scores/scores.jsonl` (not in git). The result card shows the score, grade, each metric's penalty (the biggest one names the main mistake) and the best score for that exercise; triangle still opens the replay of the attempt.
+
 ## Tech stack and runtime architecture
 
 The stack is .NET 10 + raylib-cs + SDL3. Two selection criteria: the hard parts are physics, sound and force feedback, so the visuals only need to be adequate; and the project must be pure code, no editor, automatically testable.
@@ -204,21 +231,22 @@ The first step is M0: one day to confirm that G29 input and force feedback both 
 | M1 Physics core | Engine, turbo lag, idle compensation, clutch, vehicle, hills, hill-start assist; no UI, acceptance tests run on scripted pedal input | T1–T5 all pass |
 | M2 Drivable prototype | Real pedals and shifter, 2D instruments, tuning panel, synthesised engine sound; start tuning by feel | Flat pull-away feels like my Golf |
 | M3 v1 complete | 3D straight road and hill, camera shake, force-feedback judder and grinding; teaching mode, telemetry replay, first-time setup (FOV, speaker calibration) | Hill-start feel accepted; v1 done |
+| M4 Practice and scoring | Graded exercises (flat pull-away, two hill starts, smooth upshifts), per-step metrics and scores, result card and score history | Scores rank my attempts the way I would, and the main deduction names the real mistake |
 
 M2 uses 2D instruments instead of a 3D scene so the feet can get on the pedals and start tuning as early as possible; visuals come once the feel is right. No stage has a date.
 
 ## Open questions
 
-- [ ] How to organise practice: free driving only, or graded exercises too (flat pull-away, hill start, shift smoothness)?
-- [ ] Scoring: if graded, which metrics — number of stalls, total clutch slip energy, longitudinal jerk?
+- [x] How to organise practice: both — free driving plus graded exercises, see "Practice and scoring" (M4).
+- [x] Scoring: stalls, clutch slip energy, peak jerk, rollback, grinding, over-rev, time; see "Practice and scoring" (M4).
 - [x] T2 confirmed: treated as "must stall".
 - [x] T4 conflict with physics: changed to 70 km/h, see the M1 decision record.
-- [ ] Redline start of 6000 rpm comes from a forum; check my own tachometer.
-- [ ] Are the Australian gear ratios the same as the US ones? Can be verified from "rpm at a given speed in a given gear".
-- [ ] Tyre size: check the tyre sidewall.
+- [x] Redline start: kept at 6000 rpm (owner decision, not verified further).
+- [x] Gear ratios: US ratios kept (owner decision, not verified further).
+- [x] Tyres: kept at 205/55 R16, 1.99 m circumference (owner decision, not verified further).
 - [x] Hill scene: uphill only, 10 % by default (adjustable 0–20 %), 120 m long; downhill and reversing uphill come after v1 (M3 decision F1).
 - [x] Tuning panel vs main view: same window, toggled with Tab, panel on the right (M2 decision E1).
-- [ ] Is 8-bit pedal resolution really a bottleneck? M0 confirmed 256 levels (see the M0 record); judge by feel in M2 and decide on the Arduino upgrade.
+- [x] Pedal resolution: 8-bit kept, no Arduino upgrade (owner decision; feel accepted in M2 and M3).
 
 ## M1 decision record
 
