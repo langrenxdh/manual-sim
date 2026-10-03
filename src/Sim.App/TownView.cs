@@ -26,6 +26,7 @@ public sealed class TownView : IDisposable
     private static readonly Color Asphalt = new(70, 70, 75, 255);
     private static readonly Color Marking = new(235, 235, 235, 255);
     private static readonly Color Kerb = new(190, 190, 185, 255);
+    private static readonly Color Goal = new(245, 200, 40, 255);
     private static readonly Color[] BlockColours =
     [
         new(120, 110, 100, 255), new(140, 130, 115, 255), new(95, 105, 115, 255), new(60, 95, 60, 255),
@@ -151,7 +152,8 @@ public sealed class TownView : IDisposable
         }
     }
 
-    public void Draw(in SimState s, Rectangle area)
+    /// <param name="finishZone">A town exercise's goal [minX, minY, maxX, maxY], outlined on the ground; null for none.</param>
+    public void Draw(in SimState s, Rectangle area, double[]? finishZone = null)
     {
         EnsureTarget((int)area.Width, (int)area.Height);
         BeginTextureMode(_target);
@@ -160,12 +162,28 @@ public sealed class TownView : IDisposable
         Rlgl.DisableBackfaceCulling();
         foreach (var (a, b, c, colour) in _triangles) DrawTriangle3D(a, b, c, colour);
         foreach (var (centre, size, colour) in _blocks) DrawCubeV(centre, size, colour);
+        if (finishZone is { } z) DrawZone(z);
         Rlgl.DrawRenderBatchActive();
         Rlgl.EnableBackfaceCulling();
         EndMode3D();
         EndTextureMode();
         var source = new Rectangle(0, 0, _target.Texture.Width, -_target.Texture.Height);
         DrawTexturePro(_target.Texture, source, area, Vector2.Zero, 0, Color.White);
+    }
+
+    /// <summary>The goal outline: a band just inside the zone's edge, slightly above the markings.</summary>
+    private static void DrawZone(double[] z)
+    {
+        const float band = 0.25f, lift = MarkingLift * 2;
+        double x0 = z[0], y0 = z[1], x1 = z[2], y1 = z[3];
+        foreach (var (ax, ay, bx, by) in new[]
+                 {
+                     (x0, y0, x1, y0 + band), (x0, y1 - band, x1, y1), (x0, y0, x0 + band, y1), (x1 - band, y0, x1, y1),
+                 })
+        {
+            DrawTriangle3D(At(ax, ay, lift), At(bx, ay, lift), At(bx, by, lift), Goal);
+            DrawTriangle3D(At(ax, ay, lift), At(bx, by, lift), At(ax, by, lift), Goal);
+        }
     }
 
     private Camera3D BuildCamera(in SimState s)

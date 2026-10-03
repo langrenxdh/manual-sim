@@ -118,6 +118,14 @@ void ToggleTown()
 void StartExercise(ExerciseDef e)
 {
     activeExercise = e;
+    if (e.TownStart is { } townStart)
+    {
+        // Town exercises (M9) steer on the town map from a start pose.
+        onTown = true;
+        onHill = false;
+        physics.StartExercise(scene, 0, engageHandbrake: false, exercises, e, scene.StartEngineTempC, TownPose(townStart), town);
+        return;
+    }
     onTown = false;
     bool hill = e.Start == StartPoint.HillStart;
     onHill = hill;
@@ -348,7 +356,7 @@ while (!WindowShouldClose())
     {
         townView.Update(frame.State, GetFrameTime(), vehicle);
         townView.VerticalFovDeg = fov;
-        townView.Draw(frame.State, viewRect);
+        townView.Draw(frame.State, viewRect, frame.Exercise.FinishZone);
     }
     else
     {

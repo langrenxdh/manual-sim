@@ -16,7 +16,8 @@ public readonly record struct ExerciseStatus(
     AttemptPhase Phase,
     AttemptMetrics Metrics,
     ScoreResult? Result,
-    AttemptLive Live = default);
+    AttemptLive Live = default,
+    double[]? FinishZone = null);
 
 /// <summary>Everything a consumer needs from one physics step.</summary>
 public readonly record struct Frame(
@@ -54,7 +55,7 @@ public sealed class PhysicsLoop : IDisposable
     public bool AirConOn { get => _airConOn; set => _airConOn = value; }
 
     private sealed record ResetRequest(Road Road, double PositionM, bool EngageHandbrake,
-        ExerciseConfig? Exercises, ExerciseDef? Exercise, Scene? Scene, double? EngineTempC, StartPose? Pose);
+        ExerciseConfig? Exercises, ExerciseDef? Exercise, Scene? Scene, double? EngineTempC, StartPose? Pose, TownMap? Town = null);
 
     // Physics-thread state for graded exercises (null in free driving).
     private ExerciseConfig? _exercises;
@@ -95,8 +96,9 @@ public sealed class PhysicsLoop : IDisposable
     /// with the next plain <see cref="Reset"/>.
     /// </summary>
     public void StartExercise(Scene scene, double positionM, bool engageHandbrake, ExerciseConfig exercises, ExerciseDef exercise,
-        double? engineTempC = null, StartPose? pose = null) =>
-        Volatile.Write(ref _pendingReset, new ResetRequest(pose != null ? Road.Flat() : scene.BuildRoad(), positionM, engageHandbrake, exercises, exercise, scene, engineTempC, pose));
+        double? engineTempC = null, StartPose? pose = null, TownMap? town = null) =>
+        Volatile.Write(ref _pendingReset, new ResetRequest(pose != null ? Road.Flat() : scene.BuildRoad(), positionM, engageHandbrake,
+            exercises, exercise, scene, engineTempC, pose, town));
 
     private void Run()
     {
@@ -142,7 +144,7 @@ public sealed class PhysicsLoop : IDisposable
                     stepsInWindow++;
 
                     var exercise = _session is { } s
-                        ? new ExerciseStatus(s.Exercise, _attemptId, s.Phase, s.Metrics, s.Result, s.Live)
+                        ? new ExerciseStatus(s.Exercise, _attemptId, s.Phase, s.Metrics, s.Result, s.Live, s.FinishZone)
                         : default;
                     var frame = new Frame(sim.State, sample, reader?.DeviceName, inputError, physicsHz, overruns, exercise);
                     ForRender.Publish(frame);
@@ -184,7 +186,7 @@ public sealed class PhysicsLoop : IDisposable
         _exercises = r.Exercises;
         _exercise = r.Exercise;
         var vehicle = Effective();
-        _session = _exercises != null && _exercise != null ? new ExerciseSession(_exercises, _exercise, vehicle, r.Scene) : null;
+        _session = _exercises != null && _exercise != null ? new ExerciseSession(_exercises, _exercise, vehicle, r.Scene, r.Town) : null;
         _attemptId++;
         return r.Pose is { } pose
             ? new Simulator(vehicle, r.Road, engineTempC: r.EngineTempC, steering: true, startX: pose.X, startY: pose.Y, headingRad: pose.HeadingRad)

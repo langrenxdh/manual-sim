@@ -127,7 +127,8 @@ public sealed class ExerciseUi
                       (e.StopLine != null ? l.StoppedAtLine ? $"   stopped {m.StopErrorM:F1} m off" : "   stop at the line" : "") +
                       (e.SpeedLimitKmh is double limit ? $"   limit {limit:F0} km/h, over {m.OverSpeedS:F1} s, brake {m.BrakeS:F1} s" : "") +
                       (e.Downshift is { } d ? l.DownshiftDone ? $"   rev mismatch {m.RevMatchErrorRpm:F0} rpm"
-                          : l.DownshiftArmed ? $"   now shift down to {d.ToGear}" : $"   reach {d.MinSpeedKmh:F0} km/h in {d.FromGear}" : "");
+                          : l.DownshiftArmed ? $"   now shift down to {d.ToGear}" : $"   reach {d.MinSpeedKmh:F0} km/h in {d.FromGear}" : "") +
+                      (e.TownStart != null ? $"   off road {m.OffRoadS:F1} s{(l.OffRoad ? "  OFF THE ROAD" : "")}" : "");
         float w = Math.Min(Math.Max(Ui.Width(e.Goal, 18), Ui.Width(live, 18)) + 40, road.Width - 8);
         var r = new Rectangle(road.X + (road.Width - w) / 2, road.Y + 12, w, 92);
         DrawRectangleRounded(r, 0.15f, 6, Bg);
@@ -230,6 +231,7 @@ public sealed class ExerciseUi
         Metric.GrindingS => "Grinding",
         Metric.OverRevS => "Over-rev",
         Metric.TimeS => "Time",
+        Metric.OffRoadS => "Off the road",
         _ => m.ToString(),
     };
 
@@ -249,6 +251,7 @@ public sealed class ExerciseUi
         Metric.GrindingS => "press the clutch fully before moving the lever",
         Metric.OverRevS => "less throttle; stay out of the red zone",
         Metric.TimeS => "commit a little sooner once the clutch bites",
+        Metric.OffRoadS => "slower, and turn in later or earlier so every corner stays on the road",
         _ => m.ToString(),
     };
 }
