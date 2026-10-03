@@ -216,7 +216,7 @@ M2 uses 2D instruments instead of a 3D scene so the feet can get on the pedals a
 - [ ] Redline start of 6000 rpm comes from a forum; check my own tachometer.
 - [ ] Are the Australian gear ratios the same as the US ones? Can be verified from "rpm at a given speed in a given gear".
 - [ ] Tyre size: check the tyre sidewall.
-- [ ] Hill scene: grade range, hill length, are downhill and reversing uphill needed?
+- [x] Hill scene: uphill only, 10 % by default (adjustable 0–20 %), 120 m long; downhill and reversing uphill come after v1 (M3 decision F1).
 - [x] Tuning panel vs main view: same window, toggled with Tab, panel on the right (M2 decision E1).
 - [ ] Is 8-bit pedal resolution really a bottleneck? M0 confirmed 256 levels (see the M0 record); judge by feel in M2 and decide on the Arduino upgrade.
 
@@ -273,3 +273,20 @@ M2 uses 2D instruments instead of a 3D scene so the feet can get on the pedals a
 | E7 | The scenario grade is a constant grade; changing it restarts the car | `Road` can only be passed when constructing `Simulator`, and M2 does not change Sim.Core; the real hilly road is for M3 |
 | E8 | Engine sound settings live in `config/engine-sound.json`: harmonics 1–8 of the firing frequency, energy mainly in 2–8; load affects loudness and brightness; judder modulates harmonics 3 and up randomly per firing; turbo as filtered noise; starter as a buzz | Design doc "Feedback channels / Sound"; offline render check: no NaN, silent after a stall, 1.6 ms of computation per 21 ms audio block |
 | E9 | Instrument strip: tachometer, speedometer, gear (blinks and shows GRIND while grinding), stall / handbrake / hill-hold lights; above it a simple perspective road with evenly spaced posts | Get the feet on the pedals first; 3D scene and shift suggestion are for M3 |
+
+## M3 decision record
+
+2026-10-03, implemented locally. The gate "hill-start feel accepted" is pending my check on the G29; the result goes here.
+
+| # | Decision | Reason |
+| --- | --- | --- |
+| F1 | The scene is uphill only: 150 m flat → 120 m uphill (10 % by default, adjustable 0–20 %, 15 m linear transitions at each end) → plateau; the stop line is 60 m up the hill. All in `config/scene.json`; the same grade curve builds both the physics `Road` and the 3D road | My choice; downhill and reversing uphill come after v1 |
+| F2 | Two start points: R returns to the road start; H or the right paddle places the car 6 m before the stop line with the handbrake engaged | Stopped on a hill in neutral without the handbrake, the car rolls back before you can react; 6 m keeps the stop line in view |
+| F3 | Buttons: O = teaching mode, triangle = replay, right paddle = hill-start position; keys T / P / H do the same, F2 = first-time setup | My choice; X = starter and square = handbrake unchanged |
+| F4 | The 3D view is a render texture on the top 72 % of the window, instruments below. Camera pitch = road grade + body pitch + shake. Body pitch is a spring-damper driven by longitudinal acceleration (initially 2°/g, 1.4 Hz, damping ratio 0.35); shake is random jitter scaled by judder intensity | Not a sine of the firing phase: sampling a 27–200 Hz firing frequency at 60 fps aliases into a slow beat that looks like swaying, not judder. Coefficients in `config/camera.json` |
+| F5 | Force feedback on its own 100 Hz thread, opening the haptic device by name independently (the physics thread still polls the joystick). Judder = sine at the firing frequency scaled by judder intensity; grinding = 80 Hz sine; jolt = a short constant force when longitudinal jerk exceeds a threshold, so stalls, clutch dumps and hard braking all jolt without a special "stall" rule | Hard rule 2; M0 H9. Measured over 40 s: 4005 calls, 0 failures, max 0.2 ms; physics stayed at 1000 Hz with 0 overruns. Coefficients in `config/ffb.json` |
+| F6 | Telemetry: the physics thread pushes every step into a lock-free single-producer single-consumer ring (16 s of headroom; when full it drops and counts, never waits); a telemetry thread writes `telemetry/yyyyMMdd-HHmmss.bin` with field names in the header and 36 float32 per step; only the newest 20 files are kept; `telemetry/` is not in git | My choice; hard rule 6. A 13.6 s recording read back with no gaps and no drops |
+| F7 | Replay: the last 10 s are kept in memory. Opening it freezes a copy and plots pedals, rpm (with stall threshold and idle marked) and speed on a shared time axis; each moment where combustion stops below the stall threshold is marked in red as a stall | Design doc: see exactly when the clutch came up too fast |
+| F8 | Teaching mode: left, the clutch curve with the bite zone and the foot position; right, stall margin, idle-control usage, hill-hold state and remaining time. Sim.Core's `Clutch` became public (no behaviour change) so the overlay draws the curve the physics uses | No duplicated formula that could drift |
+| F9 | Shift suggestion: with the clutch locked and the engine firing, ↑ above 2500 rpm and ↓ below 1200 rpm (`scene.json`, dashboard section), shown in both modes | Thresholds are estimates; tune to the real car's indicator |
+| F10 | First-time setup: enter the visible screen width and viewing distance; the road view's vertical FOV = the angle its real height on the screen subtends at the eye. Speaker calibration is a 25 s logarithmic 20–250 Hz sweep. Harmonics below the speaker limit drop to 20 % and 60 % of the removed energy goes to the next two harmonics. Results go to `config/setup.json` (not in git); defaults in `setup.example.json` | Design doc: compute the FOV so the sense of speed is not trained wrong; speakers cannot play low frequencies. A true FOV on an ordinary monitor is narrow (about 16° for 60 cm wide at 70 cm), so the view looks more "zoomed in" than games; this is intentional |
