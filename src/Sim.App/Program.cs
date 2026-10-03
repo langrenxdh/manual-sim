@@ -10,12 +10,14 @@ using static Raylib_cs.Raylib;
 // H restart on the hill or the current exercise (also the right paddle), P replay of the last 10 s
 // (also triangle), T teaching mode (also O), F2 first-time setup, F11 borderless fullscreen,
 // Esc leaves an exercise, otherwise quits.
-// --screenshot FILE [--panel] [--hill] [--replay] [--teaching] [--setup] [--menu] [--exercise ID] [--frames N]:
+// --screenshot FILE [--panel] [--hill] [--replay] [--teaching] [--setup] [--menu] [--exercise ID] [--frames N] [--size WxH]:
 // save a frame after start-up and exit (checks the visuals without a person). --hill and
 // --exercise ID also work on their own.
 string? screenshotPath = args.Length >= 2 && args[0] == "--screenshot" ? Path.GetFullPath(args[1]) : null;
 bool screenshotPanel = args.Contains("--panel");
 int screenshotFrame = args.SkipWhile(a => a != "--frames").Skip(1).Select(int.Parse).FirstOrDefault(90);
+// --size WxH sets the initial window size (default 1600x900), e.g. to fit a smaller display.
+int[] windowSize = args.SkipWhile(a => a != "--size").Skip(1).Select(s => s.Split('x').Select(int.Parse).ToArray()).FirstOrDefault([1600, 900]);
 int frameCount = 0;
 
 var config = ConfigFiles.Locate();
@@ -26,7 +28,12 @@ var scene = Scene.FromJson(config.Read(ConfigFiles.SceneFile));
 var camera = CameraParams.FromJson(config.Read(ConfigFiles.CameraFile));
 var ffbParams = FfbParams.FromJson(config.Read(ConfigFiles.FfbFile));
 var exercises = ExerciseConfig.FromJson(config.Read(ConfigFiles.ExercisesFile));
-var scoreHistory = new ScoreHistory(Path.GetFullPath(Path.Combine(config.Directory, "..", "scores")));
+// Driving data lives next to config/; unattended screenshot runs use a throwaway folder so they can
+// never mix with (or tempt anyone to delete) the real telemetry and score history.
+string dataRoot = screenshotPath != null
+    ? Path.Combine(Path.GetTempPath(), "manual-sim-screenshot-data")
+    : Path.GetFullPath(Path.Combine(config.Directory, ".."));
+var scoreHistory = new ScoreHistory(Path.Combine(dataRoot, "scores"));
 var exerciseUi = new ExerciseUi();
 ExerciseDef? activeExercise = null; // null = free driving
 long recordedAttempt = -1;
@@ -42,7 +49,7 @@ UiButtons previousButtons = default;
 using var physics = new PhysicsLoop(vehicle, input, scene.BuildRoad());
 using var ffb = new FfbLoop(physics.ForFfb, ffbParams);
 using var telemetry = new TelemetryWriter(physics.ForTelemetry,
-    Path.GetFullPath(Path.Combine(config.Directory, "..", "telemetry")));
+    Path.Combine(dataRoot, "telemetry"));
 bool replayOpen = false;
 bool teaching = false;
 
@@ -112,7 +119,7 @@ var panel = new TuningPanel(
 ], config.Save) { Visible = screenshotPanel };
 
 SetConfigFlags(ConfigFlags.ResizableWindow | ConfigFlags.VSyncHint | ConfigFlags.Msaa4xHint);
-InitWindow(1600, 900, "Manual Sim - " + vehicle.Name);
+InitWindow(windowSize[0], windowSize[1], "Manual Sim - " + vehicle.Name);
 SetTargetFPS(60);
 Ui.Load();
 sceneView = new SceneView(scene, camera);
@@ -208,10 +215,12 @@ while (!WindowShouldClose())
             vehicle, Dashboard.TachMaxRpm);
     else if (activeExercise != null)
     {
-        ExerciseUi.DrawBanner(frame.Exercise, roadArea);
-        ExerciseUi.DrawResult(frame.Exercise, scoreHistory, roadArea);
+        // With teaching mode on, stay between its side boxes so neither covers the other.
+        var centre = teaching ? TeachingOverlay.Centre(roadArea) : roadArea;
+        ExerciseUi.DrawBanner(frame.Exercise, centre);
+        ExerciseUi.DrawResult(frame.Exercise, scoreHistory, centre);
     }
-    exerciseUi.DrawMenu(exercises, scoreHistory, roadArea);
+    exerciseUi.DrawMenu(exercises, scoreHistory, teaching ? TeachingOverlay.Centre(roadArea) : roadArea);
     Dashboard.Draw(frame, vehicle, scene.Dashboard, new Rectangle(viewArea.X, viewArea.Y + roadHeight, viewArea.Width, viewArea.Height - roadHeight));
     if (!panel.Visible)
         Ui.Text($"physics {frame.PhysicsHz:F0} Hz  overruns {frame.Overruns}   Tab: tuning panel", 8, h - 24, 18, Color.Gray);
@@ -226,7 +235,8 @@ while (!WindowShouldClose())
         var image = LoadImageFromScreen();
         ExportImage(image, screenshotPath);
         UnloadImage(image);
-        Console.WriteLine($"screenshot: rpm {frame.State.EngineRpm:F0} kmh {frame.State.SpeedKmh:F1} " +
+        Console.WriteLine($"screenshot: window {w}x{h} render {GetRenderWidth()}x{GetRenderHeight()} panel {panel.Visible} " +
+                          $"rpm {frame.State.EngineRpm:F0} kmh {frame.State.SpeedKmh:F1} " +
                           $"gear {frame.State.EngagedGear} input {frame.Input}");
         EndDrawing();
         break;
