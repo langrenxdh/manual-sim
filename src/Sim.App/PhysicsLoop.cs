@@ -40,6 +40,8 @@ public sealed class PhysicsLoop : IDisposable
     public LatestValue<Frame> ForRender { get; } = new();
     public LatestValue<Frame> ForAudio { get; } = new();
     public LatestValue<Frame> ForFfb { get; } = new();
+    /// <summary>Every step, for the telemetry writer (16 s of headroom at 1 kHz).</summary>
+    public SpscRing<Frame> ForTelemetry { get; } = new(1 << 14);
 
     public PhysicsLoop(VehicleParams parameters, InputConfig inputConfig, Road road)
     {
@@ -107,6 +109,7 @@ public sealed class PhysicsLoop : IDisposable
                     ForRender.Publish(frame);
                     ForAudio.Publish(frame);
                     ForFfb.Publish(frame);
+                    ForTelemetry.TryWrite(frame);
                 }
 
                 if (now - windowStart >= RateWindowS * 1000)

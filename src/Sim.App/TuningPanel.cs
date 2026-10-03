@@ -48,8 +48,8 @@ public sealed class TuningPanel
 
     public bool Visible { get; set; }
 
-    /// <summary>One extra status line under the physics readouts (force feedback).</summary>
-    public string? ExtraReadout { get; set; }
+    /// <summary>Extra status lines under the physics readouts (force feedback, telemetry).</summary>
+    public IReadOnlyList<string> ExtraReadouts { get; set; } = [];
 
     /// <param name="save">Writes (file name, JSON text) to config/.</param>
     public TuningPanel(IReadOnlyList<TunableDocument> docs, Action<string, string> save)
@@ -102,7 +102,7 @@ public sealed class TuningPanel
     public static Rectangle ListArea(Rectangle area) =>
         new(area.X, area.Y + ReadoutHeight, area.Width, area.Height - ReadoutHeight - FooterHeight);
 
-    private const float ReadoutHeight = 12 * 23 + 16;
+    private const float ReadoutHeight = 13 * 23 + 16;
     private const float FooterHeight = 3 * 22 + 8;
 
     public void Draw(Rectangle area, in Frame f, VehicleParams p)
@@ -158,7 +158,7 @@ public sealed class TuningPanel
              $"grade {s.Grade * 100:F1} %");
         Line($"hill hold {s.HillHold}   {s.HillHoldRemainingS:F1} s   {s.HillHoldForceN:F0} N");
         Line($"physics {f.PhysicsHz:F0} Hz   overruns {f.Overruns}   t {s.TimeS:F1} s");
-        if (ExtraReadout != null) Line(ExtraReadout);
+        foreach (var extra in ExtraReadouts) Line(extra);
         DrawLine((int)area.X, (int)(area.Y + ReadoutHeight - 6), (int)(area.X + area.Width),
             (int)(area.Y + ReadoutHeight - 6), Muted);
     }

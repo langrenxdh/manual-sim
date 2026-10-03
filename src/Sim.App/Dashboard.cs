@@ -14,7 +14,7 @@ public static class Dashboard
     // Gauge sweep in raylib degrees (0 = right, clockwise): bottom-left round over the top to bottom-right.
     private const float SweepStartDeg = 135;
     private const float SweepDeg = 270;
-    private const double TachMaxRpm = 7000;
+    public const double TachMaxRpm = 7000;
     private const double SpeedoMaxKmh = 220;
 
     private static readonly Color PanelBg = new(18, 18, 22, 255);
