@@ -26,35 +26,35 @@ public sealed class ExerciseUi
 
     public bool MenuOpen { get; set; }
 
-    /// <summary>Menu input. Returns the chosen exercise, or null (also null for "free driving": check <paramref name="freeDriving"/>).</summary>
-    public ExerciseDef? UpdateMenu(ExerciseConfig config, UiButtons buttons, out bool freeDriving)
+    public enum MenuChoice { None, Exercise, Progress, FreeDriving }
+
+    /// <summary>Menu input. The rows are the exercises, then "Progress", then "Free driving".</summary>
+    public MenuChoice UpdateMenu(ExerciseConfig config, UiButtons buttons, out ExerciseDef? exercise)
     {
-        freeDriving = false;
+        exercise = null;
         bool up = IsKeyPressed(KeyboardKey.Up) || (buttons.PadUp && !_previous.PadUp);
         bool down = IsKeyPressed(KeyboardKey.Down) || (buttons.PadDown && !_previous.PadDown);
         bool choose = IsKeyPressed(KeyboardKey.Enter) || IsKeyPressed(KeyboardKey.KpEnter) || (buttons.PadRight && !_previous.PadRight);
         _previous = buttons;
-        if (!MenuOpen) return null;
+        if (!MenuOpen) return MenuChoice.None;
 
-        int count = config.Exercises.Length + 1; // last row: free driving
+        int count = config.Exercises.Length + 2;
         if (up) _selected = (_selected + count - 1) % count;
         if (down) _selected = (_selected + 1) % count;
         _selected = Math.Clamp(_selected, 0, count - 1);
-        if (!choose) return null;
+        if (!choose) return MenuChoice.None;
 
         MenuOpen = false;
-        if (_selected == config.Exercises.Length)
-        {
-            freeDriving = true;
-            return null;
-        }
-        return config.Exercises[_selected];
+        if (_selected == config.Exercises.Length) return MenuChoice.Progress;
+        if (_selected == config.Exercises.Length + 1) return MenuChoice.FreeDriving;
+        exercise = config.Exercises[_selected];
+        return MenuChoice.Exercise;
     }
 
     public void DrawMenu(ExerciseConfig config, ScoreHistory history, Rectangle area)
     {
         if (!MenuOpen) return;
-        int count = config.Exercises.Length + 1;
+        int count = config.Exercises.Length + 2;
         float mw = Math.Min(MenuWidth, area.Width - 16);
         var r = new Rectangle(area.X + (area.Width - mw) / 2, area.Y + 40, mw, 90 + count * RowHeight + 40);
         DrawRectangleRounded(r, 0.04f, 6, Bg);
@@ -66,6 +66,12 @@ public sealed class ExerciseUi
             float y = r.Y + 90 + i * RowHeight;
             if (i == _selected) DrawRectangle((int)r.X + 12, (int)y, (int)r.Width - 24, (int)RowHeight - 4, Highlight);
             if (i == config.Exercises.Length)
+            {
+                Ui.Text("Progress", r.X + 28, y + 4, 24, Fg);
+                Ui.Text("Scores over time, trend and what most often costs points.", r.X + 28, y + 30, 15, Muted);
+                continue;
+            }
+            if (i == config.Exercises.Length + 1)
             {
                 Ui.Text("Free driving", r.X + 28, y + 14, 24, Fg);
                 continue;
@@ -137,6 +143,10 @@ public sealed class ExerciseUi
         Ui.Text(advice, x0, y, 19, biggest != null ? Warn : Good);
         Ui.Text("R retry   E exercises   Esc free driving   triangle replay", x0, r.Y + h - 32, 17, Muted);
     }
+
+    /// <summary>A history "main issue" (a metric name or a failure reason) in words.</summary>
+    public static string IssueText(string issue) =>
+        Enum.TryParse<Metric>(issue, out var m) ? Label(m).ToLowerInvariant() : issue;
 
     private static string Label(Metric m) => m switch
     {

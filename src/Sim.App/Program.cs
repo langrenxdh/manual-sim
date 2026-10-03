@@ -10,7 +10,7 @@ using static Raylib_cs.Raylib;
 // H restart on the hill or the current exercise (also the right paddle), P replay of the last 10 s
 // (also triangle), T teaching mode (also O), F2 first-time setup, F11 borderless fullscreen,
 // Esc leaves an exercise, otherwise quits.
-// --screenshot FILE [--panel] [--hill] [--replay] [--teaching] [--setup] [--menu] [--exercise ID] [--frames N] [--size WxH]:
+// --screenshot FILE [--panel] [--hill] [--replay] [--teaching] [--setup] [--menu] [--progress] [--exercise ID] [--frames N] [--size WxH]:
 // save a frame after start-up and exit (checks the visuals without a person). --hill and
 // --exercise ID also work on their own.
 string? screenshotPath = args.Length >= 2 && args[0] == "--screenshot" ? Path.GetFullPath(args[1]) : null;
@@ -65,10 +65,15 @@ void ToggleTeaching()
     else teaching = !teaching;
 }
 
-void ToggleReplay()
+bool progressOpen = false;
+ScoreResult? replayAttempt = null; // set: the replay shows this finished attempt against its ghost
+
+// After an exercise attempt the replay shows that whole attempt with the ghost; otherwise the last 10 s.
+void ToggleReplay(ScoreResult? finishedAttempt)
 {
     replayOpen = !replayOpen;
-    if (replayOpen) telemetry.RequestSnapshot();
+    replayAttempt = replayOpen && activeExercise != null ? finishedAttempt : null;
+    if (replayOpen && replayAttempt == null) telemetry.RequestSnapshot();
 }
 
 void Restart(bool hill)
@@ -127,6 +132,7 @@ if (args.Contains("--hill")) Restart(hill: true);
 if (args.Contains("--teaching")) teaching = true;
 if (args.SkipWhile(a => a != "--exercise").Skip(1).FirstOrDefault() is { } exerciseId) StartExercise(exercises.Find(exerciseId));
 if (args.Contains("--menu")) exerciseUi.MenuOpen = true;
+if (args.Contains("--progress")) progressOpen = true;
 engineSound = EngineSound.Start(physics.ForAudio, sound);
 if (engineSound == null) Console.Error.WriteLine("No audio device: running without engine sound.");
 else engineSound.SpeakerLowCutHz = setup.SpeakerLowCutHz;
@@ -154,8 +160,17 @@ while (!WindowShouldClose())
     else if (exerciseUi.MenuOpen)
     {
         if (IsKeyPressed(KeyboardKey.Escape) || IsKeyPressed(KeyboardKey.E)) exerciseUi.MenuOpen = false;
-        else if (exerciseUi.UpdateMenu(exercises, buttons, out bool freeDriving) is { } chosen) StartExercise(chosen);
-        else if (freeDriving) Restart(hill: false);
+        else switch (exerciseUi.UpdateMenu(exercises, buttons, out var chosen))
+        {
+            case ExerciseUi.MenuChoice.Exercise: StartExercise(chosen!); break;
+            case ExerciseUi.MenuChoice.Progress: progressOpen = true; break;
+            case ExerciseUi.MenuChoice.FreeDriving: Restart(hill: false); break;
+        }
+    }
+    else if (progressOpen)
+    {
+        exerciseUi.UpdateMenu(exercises, buttons, out _); // keeps D-pad edge tracking current
+        if (IsKeyPressed(KeyboardKey.Escape) || IsKeyPressed(KeyboardKey.E)) progressOpen = false;
     }
     else
     {
@@ -169,11 +184,11 @@ while (!WindowShouldClose())
         if (IsKeyPressed(KeyboardKey.Tab)) panel.Visible = !panel.Visible;
         if (IsKeyPressed(KeyboardKey.R)) RestartOrRetry(hill: false);
         if (IsKeyPressed(KeyboardKey.H)) RestartOrRetry(hill: true);
-        if (IsKeyPressed(KeyboardKey.P)) ToggleReplay();
+        if (IsKeyPressed(KeyboardKey.P)) ToggleReplay(frame.Exercise.Result);
         if (IsKeyPressed(KeyboardKey.T)) ToggleTeaching();
         if (IsKeyPressed(KeyboardKey.F2)) setupScreen.Open(setup);
         if (buttons.HillStart && !previousButtons.HillStart) RestartOrRetry(hill: true);
-        if (buttons.Replay && !previousButtons.Replay) ToggleReplay();
+        if (buttons.Replay && !previousButtons.Replay) ToggleReplay(frame.Exercise.Result);
         if (buttons.TeachingMode && !previousButtons.TeachingMode) ToggleTeaching();
     }
 
@@ -210,9 +225,13 @@ while (!WindowShouldClose())
     sceneView.Draw(frame.State, new Rectangle(viewArea.X, viewArea.Y, viewArea.Width, roadHeight));
     var roadArea = new Rectangle(viewArea.X, viewArea.Y, viewArea.Width, roadHeight);
     if (teaching && !replayOpen) TeachingOverlay.Draw(frame, vehicle, roadArea);
-    if (replayOpen)
-        ReplayView.Draw(telemetry.TakeSnapshot(), new Rectangle(viewArea.X, viewArea.Y, viewArea.Width, roadHeight),
-            vehicle, Dashboard.TachMaxRpm);
+    if (progressOpen)
+        ProgressView.Draw(exercises, scoreHistory, roadArea);
+    else if (replayOpen && replayAttempt != null)
+        AttemptReplayView.Draw(replayAttempt, scoreHistory.Ghost(replayAttempt.ExerciseId), exercises.Coaching,
+            roadArea, vehicle, Dashboard.TachMaxRpm);
+    else if (replayOpen)
+        ReplayView.Draw(telemetry.TakeSnapshot(), roadArea, vehicle, Dashboard.TachMaxRpm);
     else if (activeExercise != null)
     {
         // With teaching mode on, stay between its side boxes so neither covers the other.
@@ -228,7 +247,7 @@ while (!WindowShouldClose())
     setupScreen.Draw(new Rectangle(0, 0, w, h));
 
     if (screenshotPath != null && args.Contains("--replay") && frameCount == screenshotFrame - 30 && !replayOpen)
-        ToggleReplay();
+        ToggleReplay(frame.Exercise.Result);
     if (screenshotPath != null && ++frameCount == screenshotFrame)
     {
         Rlgl.DrawRenderBatchActive();
