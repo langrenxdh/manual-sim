@@ -42,8 +42,10 @@ public static class Dashboard
     public static void Draw(in Frame f, VehicleParams p, Rectangle area)
     {
         float roadHeight = area.Height * 0.68f;
+        BeginScissorMode((int)area.X, (int)area.Y, (int)area.Width, (int)area.Height);
         DrawRoad(f.State, new Rectangle(area.X, area.Y, area.Width, roadHeight));
         DrawInstruments(f, p, new Rectangle(area.X, area.Y + roadHeight, area.Width, area.Height - roadHeight));
+        EndScissorMode();
     }
 
     private static void DrawRoad(in SimState s, Rectangle r)
@@ -121,10 +123,10 @@ public static class Dashboard
         if (s.Grinding) Ui.Centred("GRIND", cx, r.Y + r.Height * 0.52f, 28, Redline);
 
         bool engineOff = !s.Firing && s.EngineRpm < p.Engine.StallRpm;
-        float lightsY = r.Y + r.Height * 0.66f;
-        Light("ENGINE", cx - 150, lightsY, engineOff, Redline);
-        Light("(P)", cx - 40, lightsY, f.Input.Input.Handbrake, Redline);
-        Light("HOLD", cx + 50, lightsY, s.HillHold != HillHoldState.Inactive, new Color(60, 200, 90, 255));
+        Lights(cx, r.Y + r.Height * 0.66f,
+            ("ENGINE", engineOff, Redline),
+            ("(P)", f.Input.Input.Handbrake, Redline),
+            ("HOLD", s.HillHold != HillHoldState.Inactive, new Color(60, 200, 90, 255)));
 
         string status = f.InputError != null ? $"input error: {f.InputError}"
             : !f.Input.Connected ? "NO WHEEL - plug in the G29 (PS3 mode)"
@@ -158,9 +160,19 @@ public static class Dashboard
         DrawCircleV(c, radius * 0.06f, Needle);
     }
 
-    private static void Light(string text, float x, float y, bool on, Color colour)
+    private const float LightTextSize = 26;
+    private const float LightGap = 24;
+
+    /// <summary>Warning lights in one row centred on cx; lit ones in their colour, others dim.</summary>
+    private static void Lights(float cx, float y, params (string Text, bool On, Color Colour)[] lights)
     {
-        Ui.Text(text, x, y, 26, on ? colour : Dim);
+        float total = lights.Sum(l => Ui.Width(l.Text, LightTextSize)) + LightGap * (lights.Length - 1);
+        float x = cx - total / 2;
+        foreach (var (text, on, colour) in lights)
+        {
+            Ui.Text(text, x, y, LightTextSize, on ? colour : Dim);
+            x += Ui.Width(text, LightTextSize) + LightGap;
+        }
     }
 
     private static string GearText(Gear g) => g switch
