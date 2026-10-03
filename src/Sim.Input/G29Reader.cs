@@ -5,7 +5,8 @@ using static SDL.SDL3;
 namespace Sim.Input;
 
 /// <summary>Wheel buttons that control the app rather than the car (held state; consumers detect presses).</summary>
-public readonly record struct UiButtons(bool TeachingMode, bool Replay, bool HillStart);
+public readonly record struct UiButtons(bool TeachingMode, bool Replay, bool HillStart,
+    bool PadUp = false, bool PadDown = false, bool PadRight = false);
 
 /// <summary>One poll of the wheel: what the physics gets, plus the pre-filter values for display.</summary>
 public readonly record struct InputSample(
@@ -81,7 +82,8 @@ public sealed unsafe class G29Reader : IDisposable
         var input = new DriverInput(clutch, throttle, brake, Lever(c), _handbrakeOn, Button(c.StarterButton));
         return new InputSample(input, true, _clutch.Normalised, _throttle.Normalised, _brake.Normalised,
             _clutchReported && _throttleReported && _brakeReported,
-            new UiButtons(Button(c.TeachingModeButton), Button(c.ReplayButton), Button(c.HillStartButton)));
+            new UiButtons(Button(c.TeachingModeButton), Button(c.ReplayButton), Button(c.HillStartButton),
+                Hat(SDL_HAT_UP), Hat(SDL_HAT_DOWN), Hat(SDL_HAT_RIGHT)));
     }
 
     /// <summary>Sets the handbrake on, e.g. when the car is placed on a hill. The button still toggles it.</summary>
@@ -104,6 +106,10 @@ public sealed unsafe class G29Reader : IDisposable
     }
 
     private bool Button(int index) => SDL_GetJoystickButton(_joystick, index);
+
+    /// <summary>D-pad direction held (hat 0; diagonals count for both directions).</summary>
+    private bool Hat(uint direction) =>
+        SDL_GetNumJoystickHats(_joystick) > 0 && (SDL_GetJoystickHat(_joystick, 0) & direction) != 0;
 
     private void TryOpen()
     {

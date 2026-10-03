@@ -274,12 +274,20 @@ public sealed class TuningPanel
         }
     }
 
-    private static void AddArray(List<Row> rows, TunableDocument d, JsonArray arr, Type? type, string path, int depth)
+    private void AddArray(List<Row> rows, TunableDocument d, JsonArray arr, Type? type, string path, int depth)
     {
         var elementType = type?.IsArray == true ? type.GetElementType() : null;
         for (int i = 0; i < arr.Count; i++)
         {
-            if (arr[i] is JsonArray pair && pair.Count == 2)
+            if (arr[i] is JsonObject obj)
+            {
+                // Arrays of records (exercises, scoring rows): one group each, named by its id or metric.
+                string p = $"{path}/{i}";
+                string label = (obj["id"] ?? obj["metric"])?.GetValue<string>() ?? $"[{i}]";
+                rows.Add(new Row(p, depth, label, Kind.Group, d, arr, null, i));
+                if (_expanded.Contains(p)) AddObject(rows, d, obj, elementType, p, depth + 1);
+            }
+            else if (arr[i] is JsonArray pair && pair.Count == 2)
             {
                 // [x, y] pairs (curves, harmonics): x is the key, kept fixed so curves stay increasing; y is tuned.
                 string label = type == typeof(Curve) ? $"at {pair[0]!.ToJsonString()}" : $"[{pair[0]!.ToJsonString()}]";

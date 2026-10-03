@@ -2,14 +2,17 @@ using Raylib_cs;
 using Sim.App;
 using Sim.Core;
 using Sim.Input;
+using Sim.Training;
 using static Raylib_cs.Raylib;
 
-// M2 drivable prototype (docs/design.md, 开发里程碑).
-// Keys: Tab tuning panel, R restart at the road start, H restart on the hill (also the right paddle),
-// P replay of the last 10 s (also triangle), T teaching mode (also O), F2 first-time setup,
-// F11 borderless fullscreen, Esc quit.
-// --screenshot FILE [--panel] [--hill] [--replay] [--teaching] [--setup] [--frames N]: save a frame after start-up and exit (checks the visuals without a
-// person); --hill also works on its own to start on the hill.
+// Manual transmission practice simulator (docs/design.en.md).
+// Keys: Tab tuning panel, E exercises, R restart (the road start, or the current exercise),
+// H restart on the hill or the current exercise (also the right paddle), P replay of the last 10 s
+// (also triangle), T teaching mode (also O), F2 first-time setup, F11 borderless fullscreen,
+// Esc leaves an exercise, otherwise quits.
+// --screenshot FILE [--panel] [--hill] [--replay] [--teaching] [--setup] [--menu] [--exercise ID] [--frames N]:
+// save a frame after start-up and exit (checks the visuals without a person). --hill and
+// --exercise ID also work on their own.
 string? screenshotPath = args.Length >= 2 && args[0] == "--screenshot" ? Path.GetFullPath(args[1]) : null;
 bool screenshotPanel = args.Contains("--panel");
 int screenshotFrame = args.SkipWhile(a => a != "--frames").Skip(1).Select(int.Parse).FirstOrDefault(90);
@@ -22,6 +25,11 @@ var sound = SoundParams.FromJson(config.Read(ConfigFiles.SoundFile));
 var scene = Scene.FromJson(config.Read(ConfigFiles.SceneFile));
 var camera = CameraParams.FromJson(config.Read(ConfigFiles.CameraFile));
 var ffbParams = FfbParams.FromJson(config.Read(ConfigFiles.FfbFile));
+var exercises = ExerciseConfig.FromJson(config.Read(ConfigFiles.ExercisesFile));
+var scoreHistory = new ScoreHistory(Path.GetFullPath(Path.Combine(config.Directory, "..", "scores")));
+var exerciseUi = new ExerciseUi();
+ExerciseDef? activeExercise = null; // null = free driving
+long recordedAttempt = -1;
 // Machine-specific setup; until it has run, the FOV comes from camera.json and the rest from the example.
 bool setupDone = config.Exists(ConfigFiles.SetupFile);
 var setup = SetupParams.FromJson(config.Read(setupDone ? ConfigFiles.SetupFile : ConfigFiles.SetupExampleFile));
@@ -58,8 +66,24 @@ void ToggleReplay()
 
 void Restart(bool hill)
 {
+    activeExercise = null;
     onHill = hill;
     physics.Reset(scene.BuildRoad(), hill ? scene.HillStartPositionM : 0, engageHandbrake: hill);
+}
+
+void StartExercise(ExerciseDef e)
+{
+    activeExercise = e;
+    bool hill = e.Start == StartPoint.HillStart;
+    onHill = hill;
+    physics.StartExercise(scene.BuildRoad(), hill ? scene.HillStartPositionM : 0, engageHandbrake: hill, exercises, e);
+}
+
+// R / H / right paddle retry the current exercise; in free driving they are the two restarts.
+void RestartOrRetry(bool hill)
+{
+    if (activeExercise != null) StartExercise(activeExercise);
+    else Restart(hill);
 }
 
 var panel = new TuningPanel(
@@ -82,6 +106,9 @@ var panel = new TuningPanel(
     new TunableDocument("Force feedback", ConfigFiles.FfbFile, typeof(FfbParams),
         config.Read(ConfigFiles.FfbFile), FfbParams.FromJson,
         o => ffb.Params = (FfbParams)o),
+    new TunableDocument("Exercises (apply to the next attempt)", ConfigFiles.ExercisesFile, typeof(ExerciseConfig),
+        config.Read(ConfigFiles.ExercisesFile), ExerciseConfig.FromJson,
+        o => exercises = (ExerciseConfig)o),
 ], config.Save) { Visible = screenshotPanel };
 
 SetConfigFlags(ConfigFlags.ResizableWindow | ConfigFlags.VSyncHint | ConfigFlags.Msaa4xHint);
@@ -91,6 +118,8 @@ Ui.Load();
 sceneView = new SceneView(scene, camera);
 if (args.Contains("--hill")) Restart(hill: true);
 if (args.Contains("--teaching")) teaching = true;
+if (args.SkipWhile(a => a != "--exercise").Skip(1).FirstOrDefault() is { } exerciseId) StartExercise(exercises.Find(exerciseId));
+if (args.Contains("--menu")) exerciseUi.MenuOpen = true;
 engineSound = EngineSound.Start(physics.ForAudio, sound);
 if (engineSound == null) Console.Error.WriteLine("No audio device: running without engine sound.");
 else engineSound.SpeakerLowCutHz = setup.SpeakerLowCutHz;
@@ -115,18 +144,37 @@ while (!WindowShouldClose())
         if (IsKeyPressed(KeyboardKey.Escape)) setupScreen.Cancel();
         setupScreen.Update(buttons, GetFrameTime());
     }
+    else if (exerciseUi.MenuOpen)
+    {
+        if (IsKeyPressed(KeyboardKey.Escape) || IsKeyPressed(KeyboardKey.E)) exerciseUi.MenuOpen = false;
+        else if (exerciseUi.UpdateMenu(exercises, buttons, out bool freeDriving) is { } chosen) StartExercise(chosen);
+        else if (freeDriving) Restart(hill: false);
+    }
     else
     {
-        if (IsKeyPressed(KeyboardKey.Escape)) break;
+        exerciseUi.UpdateMenu(exercises, buttons, out _); // keeps D-pad edge tracking current
+        if (IsKeyPressed(KeyboardKey.Escape))
+        {
+            if (activeExercise == null) break;
+            Restart(hill: false);
+        }
+        if (IsKeyPressed(KeyboardKey.E)) exerciseUi.MenuOpen = true;
         if (IsKeyPressed(KeyboardKey.Tab)) panel.Visible = !panel.Visible;
-        if (IsKeyPressed(KeyboardKey.R)) Restart(hill: false);
-        if (IsKeyPressed(KeyboardKey.H)) Restart(hill: true);
+        if (IsKeyPressed(KeyboardKey.R)) RestartOrRetry(hill: false);
+        if (IsKeyPressed(KeyboardKey.H)) RestartOrRetry(hill: true);
         if (IsKeyPressed(KeyboardKey.P)) ToggleReplay();
         if (IsKeyPressed(KeyboardKey.T)) ToggleTeaching();
         if (IsKeyPressed(KeyboardKey.F2)) setupScreen.Open(setup);
-        if (buttons.HillStart && !previousButtons.HillStart) Restart(hill: true);
+        if (buttons.HillStart && !previousButtons.HillStart) RestartOrRetry(hill: true);
         if (buttons.Replay && !previousButtons.Replay) ToggleReplay();
         if (buttons.TeachingMode && !previousButtons.TeachingMode) ToggleTeaching();
+    }
+
+    // Record each finished attempt once.
+    if (frame.Exercise.Result is { } result && frame.Exercise.AttemptId != recordedAttempt)
+    {
+        recordedAttempt = frame.Exercise.AttemptId;
+        scoreHistory.Record(result);
     }
     previousButtons = buttons;
     if (IsKeyPressed(KeyboardKey.F11)) ToggleBorderlessWindowed();
@@ -158,6 +206,12 @@ while (!WindowShouldClose())
     if (replayOpen)
         ReplayView.Draw(telemetry.TakeSnapshot(), new Rectangle(viewArea.X, viewArea.Y, viewArea.Width, roadHeight),
             vehicle, Dashboard.TachMaxRpm);
+    else if (activeExercise != null)
+    {
+        ExerciseUi.DrawBanner(frame.Exercise, roadArea);
+        ExerciseUi.DrawResult(frame.Exercise, scoreHistory, roadArea);
+    }
+    exerciseUi.DrawMenu(exercises, scoreHistory, roadArea);
     Dashboard.Draw(frame, vehicle, scene.Dashboard, new Rectangle(viewArea.X, viewArea.Y + roadHeight, viewArea.Width, viewArea.Height - roadHeight));
     if (!panel.Visible)
         Ui.Text($"physics {frame.PhysicsHz:F0} Hz  overruns {frame.Overruns}   Tab: tuning panel", 8, h - 24, 18, Color.Gray);
