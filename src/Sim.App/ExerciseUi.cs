@@ -21,7 +21,7 @@ public sealed class ExerciseUi
     private static readonly Color Warn = new(240, 200, 60, 255);
     private static readonly Color Bad = new(235, 70, 60, 255);
 
-    private int _selected;
+    private int _selected, _scroll;
     private UiButtons _previous;
 
     public bool MenuOpen { get; set; }
@@ -56,14 +56,20 @@ public sealed class ExerciseUi
         if (!MenuOpen) return;
         int count = config.Exercises.Length + 2;
         float mw = Math.Min(MenuWidth, area.Width - 16);
-        var r = new Rectangle(area.X + (area.Width - mw) / 2, area.Y + 40, mw, 90 + count * RowHeight + 40);
+        // Scroll when the rows do not fit the road view: keep the selected row visible.
+        int fits = Math.Max(1, (int)((area.Height - 40 - 90 - 20) / RowHeight));
+        int visible = Math.Min(count, fits);
+        _scroll = Math.Clamp(_scroll, Math.Max(0, _selected - visible + 1), Math.Min(_selected, count - visible));
+        var r = new Rectangle(area.X + (area.Width - mw) / 2, area.Y + 40, mw, 90 + visible * RowHeight + 20);
         DrawRectangleRounded(r, 0.04f, 6, Bg);
         Ui.Text("Exercises", r.X + 24, r.Y + 18, 32, Fg);
         Ui.Text("Up/Down (or D-pad) select, Enter (or D-pad right) start, Esc close", r.X + 24, r.Y + 58, 17, Muted);
+        if (_scroll > 0) Ui.Text("^ more", r.X + r.Width - 90, r.Y + 22, 16, Muted);
+        if (_scroll + visible < count) Ui.Text("v more", r.X + r.Width - 90, r.Y + r.Height - 22, 16, Muted);
 
-        for (int i = 0; i < count; i++)
+        for (int i = _scroll; i < _scroll + visible; i++)
         {
-            float y = r.Y + 90 + i * RowHeight;
+            float y = r.Y + 90 + (i - _scroll) * RowHeight;
             if (i == _selected) DrawRectangle((int)r.X + 12, (int)y, (int)r.Width - 24, (int)RowHeight - 4, Highlight);
             if (i == config.Exercises.Length)
             {
@@ -89,9 +95,15 @@ public sealed class ExerciseUi
     {
         if (x.Exercise is not { } e || x.Phase != AttemptPhase.Running) return;
         var m = x.Metrics;
+        var l = x.Live;
         string live = $"{m.ElapsedS:F1} s   clutch heat {m.ClutchSlipEnergyKJ:F1} kJ   jerk {m.PeakJerkMps3:F0}" +
                       (e.MaxRollbackM != null ? $"   rollback {m.RollbackM:F2} m" : "") +
-                      (m.GrindingS > 0 ? $"   grinding {m.GrindingS:F1} s" : "");
+                      (m.GrindingS > 0 ? $"   grinding {m.GrindingS:F1} s" : "") +
+                      (l.GapM is double gap ? $"   gap {gap:F1} m" : "") +
+                      (e.StopLine != null ? l.StoppedAtLine ? $"   stopped {m.StopErrorM:F1} m off" : "   stop at the line" : "") +
+                      (e.SpeedLimitKmh is double limit ? $"   limit {limit:F0} km/h, over {m.OverSpeedS:F1} s, brake {m.BrakeS:F1} s" : "") +
+                      (e.Downshift is { } d ? l.DownshiftDone ? $"   rev mismatch {m.RevMatchErrorRpm:F0} rpm"
+                          : l.DownshiftArmed ? $"   now shift down to {d.ToGear}" : $"   reach {d.MinSpeedKmh:F0} km/h in {d.FromGear}" : "");
         float w = Math.Min(Math.Max(Ui.Width(e.Goal, 18), Ui.Width(live, 18)) + 40, road.Width - 8);
         var r = new Rectangle(road.X + (road.Width - w) / 2, road.Y + 12, w, 92);
         DrawRectangleRounded(r, 0.15f, 6, Bg);

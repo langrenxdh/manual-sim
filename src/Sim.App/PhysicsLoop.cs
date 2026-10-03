@@ -15,7 +15,8 @@ public readonly record struct ExerciseStatus(
     long AttemptId,
     AttemptPhase Phase,
     AttemptMetrics Metrics,
-    ScoreResult? Result);
+    ScoreResult? Result,
+    AttemptLive Live = default);
 
 /// <summary>Everything a consumer needs from one physics step.</summary>
 public readonly record struct Frame(
@@ -135,7 +136,7 @@ public sealed class PhysicsLoop : IDisposable
                     stepsInWindow++;
 
                     var exercise = _session is { } s
-                        ? new ExerciseStatus(s.Exercise, _attemptId, s.Phase, s.Metrics, s.Result)
+                        ? new ExerciseStatus(s.Exercise, _attemptId, s.Phase, s.Metrics, s.Result, s.Live)
                         : default;
                     var frame = new Frame(sim.State, sample, reader?.DeviceName, inputError, physicsHz, overruns, exercise);
                     ForRender.Publish(frame);

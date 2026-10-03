@@ -125,6 +125,12 @@ var panel = new TuningPanel(
 
 SetConfigFlags(ConfigFlags.ResizableWindow | ConfigFlags.VSyncHint | ConfigFlags.Msaa4xHint);
 InitWindow(windowSize[0], windowSize[1], "Manual Sim - " + vehicle.Name);
+if (!IsWindowReady())
+{
+    // E.g. a disconnected remote-desktop session has no display to open a window on.
+    Console.Error.WriteLine("Could not open the window (no display available?). Exiting.");
+    return 1;
+}
 SetTargetFPS(60);
 Ui.Load();
 sceneView = new SceneView(scene, camera);
@@ -222,7 +228,8 @@ while (!WindowShouldClose())
     sceneView.Update(frame.State, GetFrameTime(), vehicle);
     float roadHeight = viewArea.Height * RoadViewShare;
     sceneView.VerticalFovDeg = setupDone ? setup.VerticalFovDeg(roadHeight, GetMonitorWidth(GetCurrentMonitor())) : null;
-    sceneView.Draw(frame.State, new Rectangle(viewArea.X, viewArea.Y, viewArea.Width, roadHeight));
+    sceneView.Draw(frame.State, new Rectangle(viewArea.X, viewArea.Y, viewArea.Width, roadHeight),
+        frame.Exercise.Live.LeadPositionM, frame.Exercise.Live.LeadBraking);
     var roadArea = new Rectangle(viewArea.X, viewArea.Y, viewArea.Width, roadHeight);
     if (teaching && !replayOpen) TeachingOverlay.Draw(frame, vehicle, roadArea);
     if (progressOpen)
@@ -267,3 +274,4 @@ sceneView.Dispose();
 engineSound?.Dispose();
 Ui.Unload();
 CloseWindow();
+return 0;

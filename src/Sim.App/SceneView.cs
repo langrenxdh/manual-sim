@@ -52,6 +52,16 @@ public sealed class SceneView : IDisposable
     private bool _hasTarget;
     private double _bodyPitchRad, _bodyPitchRate;
     private uint _rng = 0xC0FFEE;
+    private double? _leadRearM;
+    private bool _leadBraking;
+
+    // Lead car (M6 traffic queue): a hatchback-sized box with a cabin, in the ego lane.
+    private const float LeadLength = 4.3f, LeadWidth = 1.8f, BodyHeight = 0.75f, BodyClearance = 0.3f;
+    private const float CabinLength = 2.2f, CabinHeight = 0.6f, LampSize = 0.18f;
+    private static readonly Color LeadBody = new(40, 70, 130, 255);
+    private static readonly Color LeadGlass = new(30, 35, 45, 255);
+    private static readonly Color LampOff = new(110, 30, 30, 255);
+    private static readonly Color LampOn = new(255, 40, 30, 255);
 
     public CameraParams Camera { get; set; }
 
@@ -94,8 +104,11 @@ public sealed class SceneView : IDisposable
         }
     }
 
-    public void Draw(in SimState s, Rectangle area)
+    /// <param name="leadRearM">Rear bumper of an exercise's lead car (M6 queue), or null for none.</param>
+    public void Draw(in SimState s, Rectangle area, double? leadRearM = null, bool leadBraking = false)
     {
+        _leadRearM = leadRearM;
+        _leadBraking = leadBraking;
         EnsureTarget((int)area.Width, (int)area.Height);
         BeginTextureMode(_target);
         ClearBackground(Sky);
@@ -103,6 +116,7 @@ public sealed class SceneView : IDisposable
         Rlgl.DisableBackfaceCulling();
         DrawRoad(s.PositionM);
         DrawRoadside(s.PositionM);
+        DrawLeadCar();
         Rlgl.DrawRenderBatchActive(); // the batch draws later; flush while culling is still off
         Rlgl.EnableBackfaceCulling();
         EndMode3D();
@@ -194,6 +208,19 @@ public sealed class SceneView : IDisposable
             var g = PointAt(s);
             DrawCube(new Vector3(g.X, g.Y + ht / 2, lateral), d, ht, w, BlockColours[(h >> 22) % BlockColours.Length]);
         }
+    }
+
+    private void DrawLeadCar()
+    {
+        if (_leadRearM is not double rear) return;
+        var p = PointAt(rear + LeadLength / 2);
+        float bodyY = p.Y + BodyClearance + BodyHeight / 2;
+        DrawCube(new Vector3(p.X, bodyY, 0), LeadLength, BodyHeight, LeadWidth, LeadBody);
+        DrawCube(new Vector3(p.X - 0.2f, bodyY + BodyHeight / 2 + CabinHeight / 2, 0), CabinLength, CabinHeight, LeadWidth - 0.15f, LeadGlass);
+        var tail = PointAt(rear);
+        Color lamp = _leadBraking ? LampOn : LampOff;
+        foreach (float z in new[] { -LeadWidth / 2 + 0.2f, LeadWidth / 2 - 0.2f })
+            DrawCube(new Vector3(tail.X - 0.01f, bodyY + 0.15f, z), 0.05f, LampSize, LampSize * 2, lamp);
     }
 
     /// <summary>A flat quad across the road from z0 to z1, between road positions a and b.</summary>
