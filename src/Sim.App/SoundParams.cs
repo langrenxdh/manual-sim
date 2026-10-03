@@ -30,6 +30,10 @@ public sealed record SoundParams
     public required double StarterFrequencyHz { get; init; }
     /// <summary>Time constant for gain changes, so they do not click.</summary>
     public required double ParameterSmoothingS { get; init; }
+    /// <summary>Gain kept by harmonics below the speaker's low-frequency limit (from first-time setup).</summary>
+    public required double BelowSpeakerGain { get; init; }
+    /// <summary>Fraction of the removed gain added to the next two harmonics above the limit.</summary>
+    public required double LowCutCompensation { get; init; }
 
     public static SoundParams FromJson(string json)
     {
@@ -52,6 +56,8 @@ public sealed record SoundParams
         Require(TurboGain >= 0 && TurboCutoffHz > 0, "turbo gain must be >= 0 and cutoff > 0");
         Require(StarterGain >= 0 && StarterFrequencyHz > 0, "starter gain must be >= 0 and frequency > 0");
         Require(ParameterSmoothingS > 0, "parameterSmoothingS must be > 0");
+        Require(BelowSpeakerGain is >= 0 and <= 1, "belowSpeakerGain must be in [0, 1]");
+        Require(LowCutCompensation >= 0, "lowCutCompensation must be >= 0");
     }
 
     private static void Require(bool condition, string message)

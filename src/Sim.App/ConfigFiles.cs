@@ -12,6 +12,8 @@ public sealed class ConfigFiles
     public const string SceneFile = "scene.json";
     public const string CameraFile = "camera.json";
     public const string FfbFile = "ffb.json";
+    public const string SetupFile = "setup.json";
+    public const string SetupExampleFile = "setup.example.json";
 
     public string Directory { get; }
 
@@ -31,6 +33,8 @@ public sealed class ConfigFiles
     public string PathOf(string name) => Path.Combine(Directory, name);
 
     public string Read(string name) => File.ReadAllText(PathOf(name));
+
+    public bool Exists(string name) => File.Exists(PathOf(name));
 
     /// <summary>Writes new JSON, keeping the file's leading <c>//</c> comment lines.</summary>
     public void Save(string name, string json)

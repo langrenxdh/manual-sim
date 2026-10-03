@@ -21,6 +21,8 @@ public sealed unsafe class EngineSound : IDisposable
     // Load brightness reaches its full value at this harmonic order and grows linearly from order 2.
     private const double BrightnessFullOrder = 8;
     private const double StarterThirdHarmonic = 0.3;
+    private const double TestToneGain = 0.5;
+    private const int CompensatedHarmonics = 2;
 
     private static EngineSound? _instance;
 
@@ -33,6 +35,23 @@ public sealed unsafe class EngineSound : IDisposable
     private double _loudness, _turbo, _starter, _shudder, _load;
     private double _lugRandom, _noiseLowPass;
     private uint _rng = 0x9E3779B9;
+    private double[] _harmonicScale = [];
+    private double _testPhase, _testLevel, _lastTestHz;
+    private double _speakerLowCutHz, _testToneHz;
+
+    /// <summary>Speaker low-frequency limit from first-time setup; 0 = no compensation.</summary>
+    public double SpeakerLowCutHz
+    {
+        get => Volatile.Read(ref _speakerLowCutHz);
+        set => Volatile.Write(ref _speakerLowCutHz, value);
+    }
+
+    /// <summary>When above 0, a plain sine at this frequency replaces the engine (speaker sweep).</summary>
+    public double TestToneHz
+    {
+        get => Volatile.Read(ref _testToneHz);
+        set => Volatile.Write(ref _testToneHz, value);
+    }
 
     /// <summary>May be replaced at any time (tuning panel); read once per audio block.</summary>
     public SoundParams Params
@@ -92,6 +111,12 @@ public sealed unsafe class EngineSound : IDisposable
     public void Render(in Frame f, Span<float> output)
     {
         var p = Params;
+        double testHz = TestToneHz;
+        if (testHz > 0 || _testLevel > 0)
+        {
+            RenderTestTone(testHz, p, output);
+            return;
+        }
         var s = f.State;
         double rpmStart = _rpm, rpmEnd = Math.Max(0, s.EngineRpm);
         double audible = Math.Clamp(rpmEnd / p.AudibleFromRpm, 0, 1);
@@ -107,6 +132,7 @@ public sealed unsafe class EngineSound : IDisposable
         double gainSum = 0;
         foreach (var h in harmonics) gainSum += h[1];
         double norm = gainSum > 0 ? 1 / gainSum : 0;
+        ScaleForSpeaker(harmonics, rpmEnd / 60 * 2, p);
 
         for (int i = 0; i < output.Length; i++)
         {
@@ -128,10 +154,11 @@ public sealed unsafe class EngineSound : IDisposable
             double lug = 1 - p.LugModulationDepth * _shudder * _lugRandom * (0.5 + 0.5 * Math.Cos(2 * Math.PI * withinFiring));
 
             double tone = 0;
-            foreach (var h in harmonics)
+            for (int k = 0; k < harmonics.Length; k++)
             {
+                var h = harmonics[k];
                 double order = h[0];
-                double gain = h[1];
+                double gain = h[1] * _harmonicScale[k];
                 if (order > 2) gain *= 1 + p.LoadBrightness * _load * (order - 2) / (BrightnessFullOrder - 2);
                 if (order >= p.LugMinOrder) gain *= lug;
                 tone += gain * Math.Sin(2 * Math.PI * order * _phase);
@@ -147,6 +174,45 @@ public sealed unsafe class EngineSound : IDisposable
             output[i] = (float)Math.Tanh(sample);
         }
         _rpm = rpmEnd;
+    }
+
+    /// <summary>
+    /// Speakers cannot play below their limit: turn those harmonics down and give part of the removed
+    /// energy to the next harmonics above the limit (design doc, Feedback channels / Sound).
+    /// </summary>
+    private void ScaleForSpeaker(double[][] harmonics, double firingHz, SoundParams p)
+    {
+        if (_harmonicScale.Length != harmonics.Length) _harmonicScale = new double[harmonics.Length];
+        double cut = SpeakerLowCutHz, removed = 0;
+        for (int k = 0; k < harmonics.Length; k++)
+        {
+            bool below = cut > 0 && harmonics[k][0] * firingHz < cut;
+            _harmonicScale[k] = below ? p.BelowSpeakerGain : 1;
+            if (below) removed += harmonics[k][1] * (1 - p.BelowSpeakerGain);
+        }
+        int given = 0;
+        for (int k = 0; k < harmonics.Length && given < CompensatedHarmonics && removed > 0; k++)
+        {
+            if (harmonics[k][0] * firingHz < cut || harmonics[k][1] <= 0) continue;
+            _harmonicScale[k] += removed * p.LowCutCompensation / CompensatedHarmonics / harmonics[k][1];
+            given++;
+        }
+    }
+
+    private void RenderTestTone(double hz, SoundParams p, Span<float> output)
+    {
+        double target = hz > 0 ? TestToneGain : 0;
+        if (hz > 0) _lastTestHz = hz;
+        else hz = _lastTestHz; // fade out at the last frequency, not as a DC step
+        double smooth = 1 - Math.Exp(-1 / (SampleRate * p.ParameterSmoothingS));
+        for (int i = 0; i < output.Length; i++)
+        {
+            _testLevel += (target - _testLevel) * smooth;
+            if (target == 0 && _testLevel < 1e-4) _testLevel = 0;
+            _testPhase += hz / SampleRate;
+            _testPhase -= Math.Floor(_testPhase);
+            output[i] = (float)(_testLevel * Math.Sin(2 * Math.PI * _testPhase));
+        }
     }
 
     private double NextUnit()

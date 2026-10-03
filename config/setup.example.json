@@ -1,0 +1,7 @@
+// Machine-specific settings written by first-time setup (F2) to config/setup.json, which is not in git.
+// This example supplies the defaults until setup has run.
+{
+  "screenWidthCm": 60,
+  "viewingDistanceCm": 70,
+  "speakerLowCutHz": 60
+}
