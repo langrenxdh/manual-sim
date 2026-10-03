@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Sim.Core\Sim.Core.csproj" />
     <ProjectReference Include="..\Sim.Input\Sim.Input.csproj" />
+    <ProjectReference Include="..\Sim.Training\Sim.Training.csproj" />
   </ItemGroup>
 
 </Project>

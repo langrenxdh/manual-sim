@@ -2,8 +2,20 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Sim.Core;
 using Sim.Input;
+using Sim.Training;
 
 namespace Sim.App;
+
+/// <summary>
+/// The current graded exercise, if any. <see cref="AttemptId"/> grows with every (re)start, so a
+/// consumer can tell a new attempt's result from the one it already handled.
+/// </summary>
+public readonly record struct ExerciseStatus(
+    ExerciseDef? Exercise,
+    long AttemptId,
+    AttemptPhase Phase,
+    AttemptMetrics Metrics,
+    ScoreResult? Result);
 
 /// <summary>Everything a consumer needs from one physics step.</summary>
 public readonly record struct Frame(
@@ -12,7 +24,8 @@ public readonly record struct Frame(
     string? DeviceName,
     string? InputError,
     double PhysicsHz,
-    long Overruns);
+    long Overruns,
+    ExerciseStatus Exercise = default);
 
 /// <summary>
 /// The 1 kHz physics thread. It owns the wheel reader and the simulator, steps on wall-clock time
@@ -35,7 +48,14 @@ public sealed class PhysicsLoop : IDisposable
     private InputConfig? _pendingInputConfig;
     private ResetRequest? _pendingReset;
 
-    private sealed record ResetRequest(Road Road, double PositionM, bool EngageHandbrake);
+    private sealed record ResetRequest(Road Road, double PositionM, bool EngageHandbrake,
+        ExerciseConfig? Exercises, ExerciseDef? Exercise);
+
+    // Physics-thread state for graded exercises (null in free driving).
+    private ExerciseConfig? _exercises;
+    private ExerciseDef? _exercise;
+    private ExerciseSession? _session;
+    private long _attemptId;
 
     public LatestValue<Frame> ForRender { get; } = new();
     public LatestValue<Frame> ForAudio { get; } = new();
@@ -62,7 +82,15 @@ public sealed class PhysicsLoop : IDisposable
     /// is usually engaged so the car does not roll back before the driver reacts.
     /// </summary>
     public void Reset(Road road, double positionM, bool engageHandbrake) =>
-        Volatile.Write(ref _pendingReset, new ResetRequest(road, positionM, engageHandbrake));
+        Volatile.Write(ref _pendingReset, new ResetRequest(road, positionM, engageHandbrake, null, null));
+
+    /// <summary>
+    /// Restarts the car for a new attempt at an exercise. The physics runs with the exercise's
+    /// hill-assist setting and every step is scored until the attempt ends. Free driving resumes
+    /// with the next plain <see cref="Reset"/>.
+    /// </summary>
+    public void StartExercise(Road road, double positionM, bool engageHandbrake, ExerciseConfig exercises, ExerciseDef exercise) =>
+        Volatile.Write(ref _pendingReset, new ResetRequest(road, positionM, engageHandbrake, exercises, exercise));
 
     private void Run()
     {
@@ -102,10 +130,14 @@ public sealed class PhysicsLoop : IDisposable
                     var sample = reader?.Poll(Simulator.StepS)
                         ?? new InputSample(new DriverInput(0, 0, 0, Gear.Neutral), false, 0, 0, 0, false);
                     sim.Step(sample.Input);
+                    _session?.Observe(sim.State, Simulator.StepS);
                     stepsDone++;
                     stepsInWindow++;
 
-                    var frame = new Frame(sim.State, sample, reader?.DeviceName, inputError, physicsHz, overruns);
+                    var exercise = _session is { } s
+                        ? new ExerciseStatus(s.Exercise, _attemptId, s.Phase, s.Metrics, s.Result)
+                        : default;
+                    var frame = new Frame(sim.State, sample, reader?.DeviceName, inputError, physicsHz, overruns, exercise);
                     ForRender.Publish(frame);
                     ForAudio.Publish(frame);
                     ForFfb.Publish(frame);
@@ -132,7 +164,7 @@ public sealed class PhysicsLoop : IDisposable
         if (Interlocked.Exchange(ref _pendingParams, null) is { } p)
         {
             _params = p;
-            sim.Params = p;
+            sim.Params = Effective();
         }
         if (Interlocked.Exchange(ref _pendingInputConfig, null) is { } c)
         {
@@ -141,8 +173,17 @@ public sealed class PhysicsLoop : IDisposable
         }
         if (Interlocked.Exchange(ref _pendingReset, null) is not { } r) return sim;
         if (r.EngageHandbrake) reader?.EngageHandbrake();
-        return new Simulator(_params, r.Road, positionM: r.PositionM);
+
+        _exercises = r.Exercises;
+        _exercise = r.Exercise;
+        var vehicle = Effective();
+        _session = _exercises != null && _exercise != null ? new ExerciseSession(_exercises, _exercise, vehicle) : null;
+        _attemptId++;
+        return new Simulator(vehicle, r.Road, positionM: r.PositionM);
     }
+
+    /// <summary>The tuned vehicle, with the current exercise's hill-assist setting if one is running.</summary>
+    private VehicleParams Effective() => _exercise != null ? ExerciseSession.ApplyTo(_exercise, _params) : _params;
 
     /// <summary>Sleeps while far from the deadline, then spins: Sleep(1) alone overshoots.</summary>
     private static void Wait(Stopwatch clock, double deadlineMs)
