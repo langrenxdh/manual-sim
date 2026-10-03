@@ -9,5 +9,8 @@
   "reverseGearButton": 18,
   "starterButton": 0,
   "handbrakeButton": 1,
+  "teachingModeButton": 2,
+  "replayButton": 3,
+  "hillStartButton": 4,
   "reconnectIntervalS": 1.0
 }

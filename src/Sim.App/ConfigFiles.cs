@@ -9,6 +9,7 @@ public sealed class ConfigFiles
     public const string VehicleFile = "golf-110tsi.json";
     public const string InputFile = "g29.json";
     public const string SoundFile = "engine-sound.json";
+    public const string SceneFile = "scene.json";
 
     public string Directory { get; }
 

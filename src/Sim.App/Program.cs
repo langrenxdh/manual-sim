@@ -5,7 +5,8 @@ using Sim.Input;
 using static Raylib_cs.Raylib;
 
 // M2 drivable prototype (docs/design.md, 开发里程碑).
-// Keys: Tab tuning panel, R reset car, F11 borderless fullscreen, Esc quit.
+// Keys: Tab tuning panel, R restart at the road start, H restart on the hill (also the right paddle),
+// F11 borderless fullscreen, Esc quit.
 // --screenshot FILE [--panel]: save a frame after start-up and exit (checks the visuals without a person).
 string? screenshotPath = args.Length >= 2 && args[0] == "--screenshot" ? Path.GetFullPath(args[1]) : null;
 bool screenshotPanel = args.Contains("--panel");
@@ -16,10 +17,18 @@ var config = ConfigFiles.Locate();
 var vehicle = VehicleParams.FromJson(config.Read(ConfigFiles.VehicleFile));
 var input = InputConfig.FromJson(config.Read(ConfigFiles.InputFile));
 var sound = SoundParams.FromJson(config.Read(ConfigFiles.SoundFile));
+var scene = Scene.FromJson(config.Read(ConfigFiles.SceneFile));
 EngineSound? engineSound = null;
-double grade = 0;
+bool onHill = false;
+UiButtons previousButtons = default;
 
-using var physics = new PhysicsLoop(vehicle, input);
+using var physics = new PhysicsLoop(vehicle, input, scene.BuildRoad());
+
+void Restart(bool hill)
+{
+    onHill = hill;
+    physics.Reset(scene.BuildRoad(), hill ? scene.HillStartPositionM : 0, engageHandbrake: hill);
+}
 
 var panel = new TuningPanel(
 [
@@ -32,9 +41,9 @@ var panel = new TuningPanel(
     new TunableDocument("Sound", ConfigFiles.SoundFile, typeof(SoundParams),
         config.Read(ConfigFiles.SoundFile), SoundParams.FromJson,
         o => { sound = (SoundParams)o; if (engineSound != null) engineSound.Params = sound; }),
-    new TunableDocument("Scenario (changing it restarts the car)", null, typeof(Scenario),
-        """{ "gradePercent": 0 }""", Scenario.FromJson,
-        o => physics.Reset(grade = ((Scenario)o).GradePercent / 100)),
+    new TunableDocument("Scene (changing it restarts the car)", ConfigFiles.SceneFile, typeof(Scene),
+        config.Read(ConfigFiles.SceneFile), Scene.FromJson,
+        o => { scene = (Scene)o; Restart(onHill); }),
 ], config.Save) { Visible = screenshotPanel };
 
 SetConfigFlags(ConfigFlags.ResizableWindow | ConfigFlags.VSyncHint | ConfigFlags.Msaa4xHint);
@@ -47,7 +56,8 @@ if (engineSound == null) Console.Error.WriteLine("No audio device: running witho
 while (!WindowShouldClose())
 {
     if (IsKeyPressed(KeyboardKey.Tab)) panel.Visible = !panel.Visible;
-    if (IsKeyPressed(KeyboardKey.R)) physics.Reset(grade);
+    if (IsKeyPressed(KeyboardKey.R)) Restart(hill: false);
+    if (IsKeyPressed(KeyboardKey.H)) Restart(hill: true);
     if (IsKeyPressed(KeyboardKey.F11)) ToggleBorderlessWindowed();
 
     float w = GetScreenWidth(), h = GetScreenHeight();
@@ -57,6 +67,9 @@ while (!WindowShouldClose())
     panel.Update(panelArea, TuningPanel.ListArea(panelArea));
 
     var frame = physics.ForRender.Read();
+    var buttons = frame.Input.Buttons;
+    if (buttons.HillStart && !previousButtons.HillStart) Restart(hill: true);
+    previousButtons = buttons;
     BeginDrawing();
     ClearBackground(Color.Black);
     Dashboard.Draw(frame, vehicle, viewArea);

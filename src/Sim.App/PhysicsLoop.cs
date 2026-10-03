@@ -29,19 +29,21 @@ public sealed class PhysicsLoop : IDisposable
     private readonly Thread _thread;
     private volatile bool _stop;
     private VehicleParams _params;
+    private readonly Road _initialRoad;
     private InputConfig _inputConfig;
     private VehicleParams? _pendingParams;
     private InputConfig? _pendingInputConfig;
     private ResetRequest? _pendingReset;
 
-    private sealed record ResetRequest(double Grade);
+    private sealed record ResetRequest(Road Road, double PositionM, bool EngageHandbrake);
 
     public LatestValue<Frame> ForRender { get; } = new();
     public LatestValue<Frame> ForAudio { get; } = new();
 
-    public PhysicsLoop(VehicleParams parameters, InputConfig inputConfig)
+    public PhysicsLoop(VehicleParams parameters, InputConfig inputConfig, Road road)
     {
         _params = parameters;
+        _initialRoad = road;
         _inputConfig = inputConfig;
         _thread = new Thread(Run) { Name = "Physics 1 kHz", IsBackground = true, Priority = ThreadPriority.Highest };
         _thread.Start();
@@ -52,8 +54,12 @@ public sealed class PhysicsLoop : IDisposable
 
     public void SubmitInputConfig(InputConfig c) => Volatile.Write(ref _pendingInputConfig, c);
 
-    /// <summary>Restarts the car at rest, in neutral, at idle, on a road of constant grade.</summary>
-    public void Reset(double grade) => Volatile.Write(ref _pendingReset, new ResetRequest(grade));
+    /// <summary>
+    /// Restarts the car at rest, in neutral, at idle, at a position on a road. On a hill the handbrake
+    /// is usually engaged so the car does not roll back before the driver reacts.
+    /// </summary>
+    public void Reset(Road road, double positionM, bool engageHandbrake) =>
+        Volatile.Write(ref _pendingReset, new ResetRequest(road, positionM, engageHandbrake));
 
     private void Run()
     {
@@ -65,7 +71,7 @@ public sealed class PhysicsLoop : IDisposable
             try { reader = new G29Reader(_inputConfig); }
             catch (Exception ex) { inputError = ex.Message; }
 
-            var sim = new Simulator(_params, Road.Flat());
+            var sim = new Simulator(_params, _initialRoad);
             var clock = Stopwatch.StartNew();
             long stepsDone = 0, overruns = 0, stepsInWindow = 0;
             double windowStart = 0, physicsHz = 0;
@@ -128,9 +134,9 @@ public sealed class PhysicsLoop : IDisposable
             _inputConfig = c;
             if (reader != null) reader.Config = c;
         }
-        return Interlocked.Exchange(ref _pendingReset, null) is { } r
-            ? new Simulator(_params, Road.Constant(r.Grade))
-            : sim;
+        if (Interlocked.Exchange(ref _pendingReset, null) is not { } r) return sim;
+        if (r.EngageHandbrake) reader?.EngageHandbrake();
+        return new Simulator(_params, r.Road, positionM: r.PositionM);
     }
 
     /// <summary>Sleeps while far from the deadline, then spins: Sleep(1) alone overshoots.</summary>

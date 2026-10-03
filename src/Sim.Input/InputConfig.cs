@@ -21,6 +21,12 @@ public sealed record InputConfig
     public required int StarterButton { get; init; }
     /// <summary>Pressed: handbrake toggles on/off.</summary>
     public required int HandbrakeButton { get; init; }
+    /// <summary>Pressed: switch between immersion and teaching mode.</summary>
+    public required int TeachingModeButton { get; init; }
+    /// <summary>Pressed: show or hide the replay of the last seconds.</summary>
+    public required int ReplayButton { get; init; }
+    /// <summary>Pressed: put the car on the hill just before the stop line.</summary>
+    public required int HillStartButton { get; init; }
     /// <summary>How often to look for the wheel again while it is disconnected.</summary>
     public required double ReconnectIntervalS { get; init; }
 
@@ -51,6 +57,7 @@ public sealed record InputConfig
         Brake.Validate("brake");
         Require(ForwardGearButtons.Length == 6, "forwardGearButtons must list 6 gears");
         Require(ForwardGearButtons.Append(ReverseGearButton).Append(StarterButton).Append(HandbrakeButton)
+            .Append(TeachingModeButton).Append(ReplayButton).Append(HillStartButton)
             .All(b => b >= 0), "button numbers must be >= 0");
         Require(ReconnectIntervalS > 0, "reconnectIntervalS must be > 0");
     }

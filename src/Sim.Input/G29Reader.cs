@@ -4,6 +4,9 @@ using static SDL.SDL3;
 
 namespace Sim.Input;
 
+/// <summary>Wheel buttons that control the app rather than the car (held state; consumers detect presses).</summary>
+public readonly record struct UiButtons(bool TeachingMode, bool Replay, bool HillStart);
+
 /// <summary>One poll of the wheel: what the physics gets, plus the pre-filter values for display.</summary>
 public readonly record struct InputSample(
     DriverInput Input,
@@ -11,7 +14,8 @@ public readonly record struct InputSample(
     double ClutchNormalised,
     double ThrottleNormalised,
     double BrakeNormalised,
-    bool PedalsReported);
+    bool PedalsReported,
+    UiButtons Buttons = default);
 
 /// <summary>
 /// Reads the G29 through SDL3 (joystick subsystem only, no window). Create, poll and dispose it on
@@ -76,8 +80,12 @@ public sealed unsafe class G29Reader : IDisposable
 
         var input = new DriverInput(clutch, throttle, brake, Lever(c), _handbrakeOn, Button(c.StarterButton));
         return new InputSample(input, true, _clutch.Normalised, _throttle.Normalised, _brake.Normalised,
-            _clutchReported && _throttleReported && _brakeReported);
+            _clutchReported && _throttleReported && _brakeReported,
+            new UiButtons(Button(c.TeachingModeButton), Button(c.ReplayButton), Button(c.HillStartButton)));
     }
+
+    /// <summary>Sets the handbrake on, e.g. when the car is placed on a hill. The button still toggles it.</summary>
+    public void EngageHandbrake() => _handbrakeOn = true;
 
     private Gear Lever(InputConfig c)
     {
