@@ -1,5 +1,7 @@
 # HwProbe — M0 硬件验证
 
+> 中文版。英文版见 [`README.en.md`](README.en.md)。两个文件同步维护。
+
 用 SDL3 读 G29 原始输入、驱动力反馈。门槛（design.md）：**离合是独立模拟轴，SDL3 能驱动 G29 力反馈。**
 
 ## 准备

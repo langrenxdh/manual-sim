@@ -480,3 +480,9 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+# Telemetry recordings (1 kHz, ~500 MB/hour), kept locally only
+telemetry/
+
+# Written by first-time setup; specific to this machine (screen, seat, speakers)
+config/setup.json

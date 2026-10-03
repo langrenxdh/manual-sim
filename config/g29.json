@@ -1,0 +1,16 @@
+// Logitech G29 input mapping, measured in M0 (docs/design.md, M0 记录).
+// Wheel must be in PS3 mode; G HUB "Combined Pedals" off. Pedal axes read +32767 released, -32768 floored.
+{
+  "deviceNameContains": "G29",
+  "clutch": { "axis": 3, "inverted": true, "deadZoneReleased": 0.02, "deadZonePressed": 0.02, "lowPassCutoffHz": 20 },
+  "throttle": { "axis": 1, "inverted": true, "deadZoneReleased": 0.02, "deadZonePressed": 0.02, "lowPassCutoffHz": 20 },
+  "brake": { "axis": 2, "inverted": true, "deadZoneReleased": 0.02, "deadZonePressed": 0.02, "lowPassCutoffHz": 20 },
+  "forwardGearButtons": [12, 13, 14, 15, 16, 17],
+  "reverseGearButton": 18,
+  "starterButton": 0,
+  "handbrakeButton": 1,
+  "teachingModeButton": 2,
+  "replayButton": 3,
+  "hillStartButton": 4,
+  "reconnectIntervalS": 1.0
+}

@@ -1,0 +1,17 @@
+// v1 scene (docs/design.md, 坡道与起步辅助 / design.en.md, Hills and hill-start assist): a straight road,
+// flat, then one uphill section with a stop line on it, then a flat plateau. Grade changes linearly
+// over the transition length at each end of the hill. Distances in metres along the road.
+{
+  "hill": {
+    "startM": 150,
+    "lengthM": 120,
+    "gradePercent": 10,
+    "transitionM": 15,
+    "stopLineFromHillStartM": 60
+  },
+  "hillStartBehindLineM": 6,
+  "dashboard": {
+    "upshiftRpm": 2500,
+    "downshiftRpm": 1200
+  }
+}
