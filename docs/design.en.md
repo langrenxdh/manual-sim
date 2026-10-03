@@ -161,6 +161,11 @@ Both ways of using it: **free driving** (drive as you like, as in v1) and **grad
 | X2 | Hill start (assist) | 6 m before the stop line, handbrake on, assist on | 15 m driven uphill, 1st or higher, clutch locked | Stall, or rolls back more than 0.5 m |
 | X3 | Hill start (handbrake) | Same, assist **off** | Same | Same |
 | X4 | Smooth upshifts | Road start, stopped | In 3rd or higher, clutch locked, ≥ 40 km/h | Stall |
+| X5 | Traffic queue (M6) | Road start, a car 3 m ahead | After the lead car's last stop, stopped behind it for 1 s | Stall, or closer than 0.5 m to the car ahead |
+| X6 | Stop on the line, pull away (M6) | Road start | First stop before the stop line (front 0.5 m from it is ideal), then drive 15 m uphill, 1st or higher, clutch locked | Stall, running the line, rolling back more than 0.5 m |
+| X7 | Downhill (M6) | Plateau at the top, stopped | At the bottom, 2nd or higher, clutch locked | Stall |
+| X8 | Reverse uphill (M6) | Bottom of the downhill, the slope rising behind | Reverse 20 m up it, clutch locked | Stall, or rolling forward more than 0.5 m |
+| X9 | Rev-matched downshift (M6) | Road start, stopped | After 45 km/h in 3rd, shift down to 2nd; 2nd, clutch locked, ≥ 20 km/h | Stall |
 
 **Metrics** (per attempt, computed every step at 1 kHz):
 
@@ -173,6 +178,13 @@ Both ways of using it: **free driving** (drive as you like, as in v1) and **grad
 | Grinding (s) | Selecting a gear without the clutch fully down | Time with `Grinding` true |
 | Over-rev (s) | Flaring into the red zone | Time above the redline start |
 | Time (s) | Dawdling | Penalised only beyond a generous par time; rushing is never rewarded |
+| Gap outside band (s, M6) | Following too close or too far | Time with the gap to the car ahead outside the comfort band (1.5–8 m) |
+| Stop error (m, M6) | Stopping too far from or too close to the line | Distance of the front bumper from "0.5 m before the line" |
+| Over-speed (s, M6) | Letting it run downhill | Time above the exercise's speed limit |
+| Brake time (s, M6) | Holding speed on the foot brake | Time with the brake pedal above 10 % |
+| Coasting (s, M6) | Rolling in neutral or with the clutch down | Time above 5 km/h in neutral or with clutch engagement below 0.5 |
+| Rev mismatch (rpm, M6) | Downshifting without a blip | Slip speed across the clutch when the lower gear starts to bite |
+| Downshift jerk (m/s³, M6) | The lurch on a downshift | Peak jerk from the downshift onwards (launch not counted) |
 
 **Score** = 100 − sum of penalties. Each metric has a "good" value (no penalty), a "bad" value (full penalty) and a weight; the penalty grows linearly in between and the weights add up to 100. Grades: A ≥ 90, B ≥ 75, C ≥ 50, otherwise D. Each exercise has its own table in `config/exercises.json`, tunable in the panel. Initial values are calibrated with scripted driving: a T1-style flat pull-away with a 2 s clutch release must score at least a B.
 
@@ -350,3 +362,19 @@ The milestones after M4 (M5–M10: coaching, more exercises, fidelity and other 
 | H5 | Progress: a new "Progress" entry in the exercise menu. Per exercise: attempts, completions, best, average of the last 5 (failures count as 0), least-squares trend over the last 10 (points per attempt), the most common issue, and a small chart of recent scores | Counting failures as 0 is honest; a trend says more about improvement than one score |
 | H6 | Every history line records the "main issue" (the failure reason, or the metric that cost the most points) | The progress view counts it |
 | H7 | `--screenshot` runs write telemetry and scores to a temp folder and never touch the repo's `telemetry/` or `scores/` | A test cleanup once deleted my real score history and telemetry; never again |
+
+## M6 decision record (more practice without steering)
+
+2026-10-03, implemented locally. The gate "each new exercise feels like the real situation and its score is fair" is pending my check on the G29.
+
+| # | Decision | Reason |
+| --- | --- | --- |
+| J1 | The scene moves into `Sim.Training` and gains a downhill section after the plateau (plateau 100 m, downhill 200 m at 8 %, 15 m transitions) and named start points (road start, hill start, plateau, bottom of the downhill) | Tests use the real `scene.json`; the physics `Road` and the 3D road still come from one grade curve |
+| J2 | The lead car follows a script (kinematic, not physics, cannot collide) and is used only for judging: closer than 0.5 m fails, time outside a 1.5–8 m gap costs points. After the lead's last stop, being stopped behind it completes the attempt | Exercise rules judge, they never act on the car (hard rule 2); a slow follower can still finish, just with fewer points |
+| J3 | Stop line: the front bumper 0.5 m before the line is ideal; only a stop with the front within 10 m of the line counts as stopping at it; the front more than 0.5 m over the line fails ("ran the stop line"); after the stop, rollback and uphill progress count from the stop position | Waiting at the start is not stopping at the line; the chained sequence is what a real junction asks for |
+| J4 | Downhill: a 50 km/h limit; time over the limit, braking (pedal above 10 %) and coasting (above 5 km/h in neutral or with engagement below 0.5) are measured | In the model 2nd gear holds 42 km/h on an 8 % slope by engine braking alone, so the right technique scores high |
+| J5 | Reverse uphill: exercises have a travel direction; in reverse "rollback" means rolling forward and progress counts backwards; finishing needs reverse gear | The same metrics serve reversing |
+| J6 | Rev-matched downshift: armed once 3rd reaches 45 km/h; when 2nd starts to bite (engagement above 0.1) the slip speed is recorded, and jerk is tracked separately from then on | Judges the downshift itself without the launch's jerk mixed in |
+| J7 | Stopping exercises get looser jerk thresholds (queue 40→100, stop-line hill start 60→120): stopping on a slope has an unavoidable acceleration step of about 1 m/s² from gravity alone | Measured with closed-loop scripted drivers: smooth following ~54, a careful stop and pull-away on the hill ~73 |
+| J8 | Calibration (closed-loop scripted driving): queue smooth 88, slow reactions 79, late braking 41; stop-line hill start ideal ~95, 2 m short ~80, heavy throttle ~70; downhill in 2nd 98, 3rd up to 55 km/h 83; reverse gentle 100, harsh 52; downshift with blip 94–99, without 52. S6–S10 (13 tests) pin these intents | As in M4, the tests' intent never changes; only `exercises.json` is tuned |
+| J9 | When the window cannot be opened (e.g. a disconnected remote session with no display) the app says so and exits instead of crashing in raylib | Seen in practice: raylib init failed while the session was disconnected |

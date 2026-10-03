@@ -58,6 +58,8 @@ v1 (M0–M3) is complete, and M4 (graded exercises and scoring) is built. This d
 
 ### M6 — More practice without steering (ideas 1, 2, 3, 4)
 
+**Status: implemented (2026-10-03), see the M6 decision record in the design doc; hand check pending.**
+
 - **Traffic-light queue (1):** a scripted lead car (kinematic, not physics) that creeps, stops and goes in a stop-and-go pattern; a traffic light at the end of the queue. Scored on stalls, gaps that are too small or too large, clutch heat and lurch. Needs a lead car in the scene and a distance metric.
 - **Chained hill sequence (2):** start on the flat, drive to the hill, stop with the front of the car within a band before the stop line, then hill-start. Scored on the stop position, then as the existing hill start. Needs the car's front position relative to the line.
 - **Downhill and reversing uphill (3):** the scene gains a downhill section after the plateau. Downhill exercise: hold a speed limit with engine braking in a sensible gear, little foot brake. Reverse uphill: start facing downhill at the bottom of a slope and reverse up it. Needs a scene extension and a reverse start; the physics already supports reverse and negative grade.
