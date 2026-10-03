@@ -38,6 +38,18 @@ using var telemetry = new TelemetryWriter(physics.ForTelemetry,
 bool replayOpen = false;
 bool teaching = false;
 
+// The replay covers the road view, where the teaching overlays live, so asking for teaching mode while
+// the replay is open closes the replay and shows the overlays instead of toggling them out of sight.
+void ToggleTeaching()
+{
+    if (replayOpen)
+    {
+        replayOpen = false;
+        teaching = true;
+    }
+    else teaching = !teaching;
+}
+
 void ToggleReplay()
 {
     replayOpen = !replayOpen;
@@ -110,11 +122,11 @@ while (!WindowShouldClose())
         if (IsKeyPressed(KeyboardKey.R)) Restart(hill: false);
         if (IsKeyPressed(KeyboardKey.H)) Restart(hill: true);
         if (IsKeyPressed(KeyboardKey.P)) ToggleReplay();
-        if (IsKeyPressed(KeyboardKey.T)) teaching = !teaching;
+        if (IsKeyPressed(KeyboardKey.T)) ToggleTeaching();
         if (IsKeyPressed(KeyboardKey.F2)) setupScreen.Open(setup);
         if (buttons.HillStart && !previousButtons.HillStart) Restart(hill: true);
         if (buttons.Replay && !previousButtons.Replay) ToggleReplay();
-        if (buttons.TeachingMode && !previousButtons.TeachingMode) teaching = !teaching;
+        if (buttons.TeachingMode && !previousButtons.TeachingMode) ToggleTeaching();
     }
     previousButtons = buttons;
     if (IsKeyPressed(KeyboardKey.F11)) ToggleBorderlessWindowed();
