@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Sim.App/Sim.App.csproj" />
     <Project Path="src/Sim.Core/Sim.Core.csproj" />
     <Project Path="src/Sim.Input/Sim.Input.csproj" />
   </Folder>
