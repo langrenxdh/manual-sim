@@ -23,14 +23,14 @@ public static class Dashboard
     private static readonly Color Redline = new(200, 30, 30, 255);
     private static readonly Color Dim = new(70, 70, 78, 255);
 
-    public static void Draw(in Frame f, VehicleParams p, Rectangle area)
+    public static void Draw(in Frame f, VehicleParams p, DashboardParams d, Rectangle area)
     {
         BeginScissorMode((int)area.X, (int)area.Y, (int)area.Width, (int)area.Height);
-        DrawInstruments(f, p, area);
+        DrawInstruments(f, p, d, area);
         EndScissorMode();
     }
 
-    private static void DrawInstruments(in Frame f, VehicleParams p, Rectangle r)
+    private static void DrawInstruments(in Frame f, VehicleParams p, DashboardParams d, Rectangle r)
     {
         var s = f.State;
         DrawRectangleRec(r, PanelBg);
@@ -55,6 +55,7 @@ public static class Dashboard
         }
         Ui.Centred(gear, cx, r.Y + r.Height * 0.12f, (int)(r.Height * 0.38f), gearColour);
         if (s.Grinding) Ui.Centred("GRIND", cx, r.Y + r.Height * 0.52f, 28, Redline);
+        ShiftSuggestion(s, d, cx + r.Height * 0.22f, r.Y + r.Height * 0.3f, r.Height * 0.08f);
 
         bool engineOff = !s.Firing && s.EngineRpm < p.Engine.StallRpm;
         Lights(cx, r.Y + r.Height * 0.66f,
@@ -92,6 +93,20 @@ public static class Dashboard
 
         DrawLineEx(c, At(Angle(value), radius * 0.88f), 4, Needle);
         DrawCircleV(c, radius * 0.06f, Needle);
+    }
+
+    /// <summary>
+    /// Golf-style gear recommendation: an up or down arrow beside the gear, only while driving in gear
+    /// (clutch locked, engine firing), from the rpm thresholds in scene.json.
+    /// </summary>
+    private static void ShiftSuggestion(in SimState s, DashboardParams d, float x, float cy, float size)
+    {
+        int gear = (int)s.EngagedGear;
+        if (!s.ClutchLocked || !s.Firing || gear < 1) return;
+        if (gear < 6 && s.EngineRpm > d.UpshiftRpm)
+            DrawTriangle(new Vector2(x, cy - size), new Vector2(x - size, cy + size), new Vector2(x + size, cy + size), Dial);
+        else if (gear > 1 && s.EngineRpm < d.DownshiftRpm)
+            DrawTriangle(new Vector2(x - size, cy - size), new Vector2(x, cy + size), new Vector2(x + size, cy - size), Dial);
     }
 
     private const float LightTextSize = 26;
