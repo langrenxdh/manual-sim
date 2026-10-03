@@ -1,0 +1,79 @@
+// 2019 VW Golf 110TSI, 1.4 L turbo, 6-speed manual. See docs/design.md for sources.
+// Torque curves are gross combustion torque; full-load brake torque = naTorqueNm + boostTorqueNm - frictionTorqueNm
+// and is checked against the published 250 Nm @ 1500-3500 rpm / 110 kW @ 5000-6000 rpm by the tests.
+{
+  "name": "VW Golf 110TSI 2019 6MT",
+  "engine": {
+    "inertiaKgM2": 0.15,
+    "idleRpm": 800,
+    "stallRpm": 400,
+    "redlineRpm": 6000,
+    "fuelCutRpm": 6800,
+    "naTorqueNm": [
+      [500, 100], [1000, 125], [1500, 135], [2000, 140], [3000, 145],
+      [4000, 148], [5000, 145], [6000, 135], [7000, 120]
+    ],
+    "boostTorqueNm": [
+      [1000, 131], [1500, 131], [2000, 128], [3000, 127], [3500, 127.5],
+      [4000, 114], [5000, 96], [6000, 77], [7000, 54]
+    ],
+    "boostTarget": [
+      [1000, 0], [1200, 0.05], [1300, 0.15], [1500, 1], [7000, 1]
+    ],
+    "boostTimeConstantS": 0.6,
+    "frictionTorqueNm": [
+      [0, 70], [200, 13], [500, 13], [1000, 15], [1500, 16], [2000, 18], [3000, 22],
+      [3500, 24], [4000, 26], [5000, 31], [6000, 37], [7000, 44]
+    ],
+    "starterStallTorqueNm": 120,
+    "starterFreeRpm": 700
+  },
+  "idleControl": {
+    "proportionalGainNmPerRpm": 0.6,
+    "integralGainNmPerRpmS": 2,
+    "maxTorqueNm": 120
+  },
+  "clutch": {
+    "maxTorqueNm": 350,
+    "bitePoint": 0.8,
+    "biteZoneWidth": 0.7,
+    "engagementExponent": 2,
+    "shiftMaxEngagement": 0.05
+  },
+  "gearbox": {
+    "forwardRatios": [4.11, 2.12, 1.36, 0.97, 0.77, 0.63],
+    "reverseRatio": 4.0,
+    "finalDriveRatio": 3.39,
+    "efficiency": 0.92,
+    "inputShaftInertiaKgM2": 0.02,
+    "inputShaftDragNm": 1.0
+  },
+  "chassis": {
+    "massKg": 1380,
+    "tyreCircumferenceM": 1.99,
+    "rollingResistanceCoeff": 0.012,
+    "dragAreaM2": 0.65,
+    "maxBrakeForceN": 13500,
+    "handbrakeForceN": 4000
+  },
+  "environment": {
+    "gravityMps2": 9.81,
+    "airDensityKgM3": 1.2
+  },
+  "hillHold": {
+    "enabled": true,
+    "minGrade": 0.03,
+    "brakePedalThreshold": 0.1,
+    "standstillSpeedMps": 0.05,
+    "holdTimeS": 2.0,
+    "holdForceN": 5000,
+    "releaseRateNPerS": 15000,
+    "driveAwayForceRatio": 1.0
+  },
+  "shudder": {
+    "maxAmplitudeRatio": 0.3,
+    "fadeOutRpm": 1300,
+    "irregularity": 0.3,
+    "seed": 20190101
+  }
+}
