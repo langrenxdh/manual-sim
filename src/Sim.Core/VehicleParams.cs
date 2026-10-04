@@ -47,6 +47,7 @@ public sealed record VehicleParams
     public void Validate()
     {
         Positive(Engine.InertiaKgM2, "engine.inertiaKgM2");
+        Require(Engine.Cylinders is >= 1 and <= 16, "engine.cylinders must be in [1, 16]");
         Positive(Engine.StallRpm, "engine.stallRpm");
         Require(Engine.IdleRpm > Engine.StallRpm, "engine.idleRpm must be above engine.stallRpm");
         Require(Engine.FuelCutRpm > Engine.IdleRpm, "engine.fuelCutRpm must be above engine.idleRpm");
@@ -104,6 +105,8 @@ public sealed record EngineParams
 {
     /// <summary>Crank + flywheel (both DMF halves) + clutch pressure plate.</summary>
     public required double InertiaKgM2 { get; init; }
+    /// <summary>Four-stroke: cylinders / 2 firings per crank revolution (sets the firing frequency).</summary>
+    public required int Cylinders { get; init; }
     public required double IdleRpm { get; init; }
     /// <summary>Below this speed combustion cannot sustain itself and produces no torque.</summary>
     public required double StallRpm { get; init; }

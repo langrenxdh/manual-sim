@@ -24,8 +24,10 @@ public readonly record struct SimState
     public bool Firing { get; init; }
     /// <summary>Shudder intensity (0..1), drives sound, force feedback and camera shake.</summary>
     public double ShudderIntensity { get; init; }
-    /// <summary>Firing pulsation phase in radians (two firings per crank revolution).</summary>
+    /// <summary>Firing pulsation phase in radians (one cycle per firing).</summary>
     public double FiringPhaseRad { get; init; }
+    /// <summary>Firings per crank revolution (cylinders / 2): firing frequency = rpm / 60 x this.</summary>
+    public double FiringsPerRev { get; init; }
 
     // Clutch
     /// <summary>Clutch engagement c (0..1).</summary>

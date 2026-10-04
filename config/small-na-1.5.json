@@ -6,6 +6,7 @@
   "name": "Small 1.5 NA petrol (illustrative)",
   "engine": {
     "inertiaKgM2": 0.11,
+    "cylinders": 4,
     "idleRpm": 750,
     "stallRpm": 380,
     "redlineRpm": 6500,

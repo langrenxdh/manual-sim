@@ -5,6 +5,7 @@
   "name": "VW Golf 110TSI 2019 6MT",
   "engine": {
     "inertiaKgM2": 0.15,
+    "cylinders": 4,
     "idleRpm": 800,
     "stallRpm": 400,
     "redlineRpm": 6000,

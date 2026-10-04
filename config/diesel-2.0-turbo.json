@@ -6,6 +6,7 @@
   "name": "2.0 turbo diesel (illustrative)",
   "engine": {
     "inertiaKgM2": 0.24,
+    "cylinders": 4,
     "idleRpm": 800,
     "stallRpm": 450,
     "redlineRpm": 4500,

@@ -101,7 +101,7 @@ public sealed class FfbLoop : IDisposable
                     var s = f.State;
                     if (p.MasterGain != appliedGain) wheel.SetGain(appliedGain = p.MasterGain);
                     if (p.CenteringSpring != appliedSpring) wheel.SetSpring(appliedSpring = p.CenteringSpring);
-                    double firingHz = Math.Max(0, s.EngineRpm) / 60 * 2;
+                    double firingHz = Math.Max(0, s.EngineRpm) / 60 * s.FiringsPerRev;
                     wheel.SetShudder(firingHz, s.Firing ? s.ShudderIntensity * p.ShudderMagnitude : 0);
                     wheel.SetGrind(p.GrindFrequencyHz, s.Grinding ? p.GrindMagnitude : 0);
                     // Steering (town map): aligning torque, damping and friction, in the sim's sign convention

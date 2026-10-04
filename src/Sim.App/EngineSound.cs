@@ -132,12 +132,13 @@ public sealed unsafe class EngineSound : IDisposable
         double gainSum = 0;
         foreach (var h in harmonics) gainSum += h[1];
         double norm = gainSum > 0 ? 1 / gainSum : 0;
-        ScaleForSpeaker(harmonics, rpmEnd / 60 * 2, p);
+        double firingsPerRev = s.FiringsPerRev > 0 ? s.FiringsPerRev : 2;
+        ScaleForSpeaker(harmonics, rpmEnd / 60 * firingsPerRev, p);
 
         for (int i = 0; i < output.Length; i++)
         {
             double rpm = rpmStart + (rpmEnd - rpmStart) * (i + 1) / output.Length;
-            double firingHz = rpm / 60 * 2;
+            double firingHz = rpm / 60 * firingsPerRev;
             double before = _phase;
             _phase += firingHz / SampleRate;
             if (Math.Floor(_phase) != Math.Floor(before)) _lugRandom = NextUnit(); // new firing event

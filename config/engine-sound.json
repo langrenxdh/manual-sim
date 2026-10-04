@@ -1,5 +1,5 @@
 // Synthesised engine sound (docs/design.md, 反馈通道 / 声音). Not physics: these only shape what the
-// physics state sounds like. Firing frequency = rpm / 60 * 2 (4-cylinder, 4-stroke).
+// physics state sounds like. Firing frequency = rpm / 60 * cylinders / 2 (4-stroke; cylinders from the car file).
 // harmonics: [order, gain] relative to the firing frequency. The fundamental (27 Hz at idle) is below
 // what PC speakers play, so energy sits in orders 2-8 and the ear fills in the missing fundamental.
 // Harmonics below the speaker limit measured in first-time setup are turned down to belowSpeakerGain,

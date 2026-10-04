@@ -29,7 +29,7 @@ public sealed class Simulator
     private double _x;           // position along the road, m
     private double _boost;       // turbo boost state B
     private double _idleIntegral;
-    private double _firingPhase; // rad, two firings per crank revolution
+    private double _firingPhase; // rad, one cycle per firing (cylinders / 2 per crank revolution)
     private double _firingFactor = 1;
     private bool _clutchLocked;
     private Gear _gear;
@@ -141,7 +141,7 @@ public sealed class Simulator
         var s = p.Shudder;
         double lowSpeed = firing ? Math.Clamp((s.FadeOutRpm - rpm) / (s.FadeOutRpm - e.StallRpm), 0, 1) : 0;
         double shudderIntensity = throttle * lowSpeed;
-        AdvanceFiringPhase(s, dt);
+        AdvanceFiringPhase(s, FiringsPerRev(p), dt);
         double pulsation = combustion * s.MaxAmplitudeRatio * lowSpeed * _firingFactor * Math.Sin(_firingPhase);
 
         double starter = input.Starter
@@ -311,10 +311,12 @@ public sealed class Simulator
         }
     }
 
-    private void AdvanceFiringPhase(ShudderParams s, double dt)
+    private static double FiringsPerRev(VehicleParams p) => p.Engine.Cylinders / 2.0;
+
+    private void AdvanceFiringPhase(ShudderParams s, double firingsPerRev, double dt)
     {
         const double cycle = 2 * Math.PI;
-        _firingPhase += 2 * _we * dt;
+        _firingPhase += firingsPerRev * _we * dt;
         if (_firingPhase >= cycle || _firingPhase < 0)
         {
             _firingPhase -= cycle * Math.Floor(_firingPhase / cycle);
@@ -414,6 +416,7 @@ public sealed class Simulator
             Firing = firing,
             ShudderIntensity = shudder,
             FiringPhaseRad = _firingPhase,
+            FiringsPerRev = FiringsPerRev(_p),
             ClutchEngagement = engagement,
             ClutchTorqueNm = clutchTorque,
             ClutchLocked = _clutchLocked,
