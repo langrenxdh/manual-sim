@@ -80,6 +80,10 @@ public readonly record struct SimState
     public double RoadWheelAngleDeg { get; init; }
     /// <summary>The front tyres are past their grip limit (understeer).</summary>
     public bool FrontSliding { get; init; }
+    /// <summary>The driven tyres are sliding lengthwise: wheelspin (driving) or locking (engine braking) (M12).</summary>
+    public bool WheelSlip { get; init; }
+    /// <summary>Surface speed of the driven wheels, m/s; equals the road speed while they grip.</summary>
+    public double DrivenWheelSpeedMps { get; init; }
     /// <summary>Torque on the steering wheel from the tyres, Nm; positive turns the wheel to the left.</summary>
     public double AligningTorqueNm { get; init; }
 }

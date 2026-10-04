@@ -112,5 +112,14 @@
     "powerAssistFactor": 0.2,
     "centringLeverM": 0.012,
     "centringFullSpeedMps": 1.5
+  },
+  "traction": {
+    "rearWheelDrive": false,
+    "cgHeightM": 0.55,
+    "peakMu": 1.0,
+    "slidingMu": 0.8,
+    "drivenWheelInertiaKgM2": 2.0,
+    "frontBrakeShare": 0.7,
+    "weightTransferTimeConstantS": 0.15
   }
 }

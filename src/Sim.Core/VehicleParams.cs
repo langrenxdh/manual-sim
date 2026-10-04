@@ -23,6 +23,7 @@ public sealed record VehicleParams
     public required EngineThermalParams EngineThermal { get; init; }
     public required AirConParams AirCon { get; init; }
     public required SteeringParams Steering { get; init; }
+    public required TractionParams Traction { get; init; }
 
     public static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -90,6 +91,12 @@ public sealed record VehicleParams
         Positive(st.PneumaticTrailFadeRatio, "steering.pneumaticTrailFadeRatio");
         Require(st.PowerAssistFactor is > 0 and <= 1, "steering.powerAssistFactor must be in (0, 1]");
         Require(st.CentringLeverM >= 0, "steering.centringLeverM must be >= 0");
+        var tr = Traction;
+        Require(tr.CgHeightM > 0 && tr.CgHeightM < st.WheelbaseM, "traction.cgHeightM must be in (0, wheelbaseM)");
+        Require(tr.PeakMu > 0 && tr.SlidingMu > 0 && tr.SlidingMu <= tr.PeakMu, "traction: 0 < slidingMu <= peakMu");
+        Positive(tr.DrivenWheelInertiaKgM2, "traction.drivenWheelInertiaKgM2");
+        Require(tr.FrontBrakeShare is >= 0 and <= 1, "traction.frontBrakeShare must be in [0, 1]");
+        Positive(tr.WeightTransferTimeConstantS, "traction.weightTransferTimeConstantS");
         Positive(st.CentringFullSpeedMps, "steering.centringFullSpeedMps");
     }
 
@@ -298,4 +305,25 @@ public sealed record ShudderParams
     /// <summary>Random cycle-to-cycle amplitude variation (0 = perfectly even firing).</summary>
     public required double Irregularity { get; init; }
     public required ulong Seed { get; init; }
+}
+
+/// <summary>
+/// Longitudinal grip of the driven tyres (M12). They grip until the force they must pass to the road
+/// exceeds <see cref="PeakMu"/> x their axle's load, then slide (wheelspin, or locking under engine
+/// braking) passing <see cref="SlidingMu"/> x load until the slip speed returns to zero. The axle load
+/// shifts rearwards with acceleration and uphill slope through the centre of gravity's height.
+/// </summary>
+public sealed record TractionParams
+{
+    /// <summary>Rear-wheel drive (the handbrake then holds driven wheels); otherwise front-wheel drive.</summary>
+    public required bool RearWheelDrive { get; init; }
+    public required double CgHeightM { get; init; }
+    public required double PeakMu { get; init; }
+    public required double SlidingMu { get; init; }
+    /// <summary>Both driven wheels with tyres, brake discs and half-shafts.</summary>
+    public required double DrivenWheelInertiaKgM2 { get; init; }
+    /// <summary>Share of the foot brake's force on the front axle.</summary>
+    public required double FrontBrakeShare { get; init; }
+    /// <summary>How quickly the body's pitch moves load between the axles.</summary>
+    public required double WeightTransferTimeConstantS { get; init; }
 }

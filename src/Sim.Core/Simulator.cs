@@ -43,6 +43,9 @@ public sealed class Simulator
     private readonly bool _steering;
     private double _worldX, _worldY, _heading, _yawRate, _lateralAccel, _roadWheelDeg, _aligningTorqueNm;
     private bool _frontSliding;
+    // M12 traction: the driven wheels either grip (wheel speed = road speed) or slide (own speed _wIn / k).
+    private bool _wheelSlip;
+    private double _transferAccel; // longitudinal acceleration as felt by the suspension (weight transfer)
 
     /// <param name="engineTempC">Engine temperature at start; null = warm (operating temperature).</param>
     /// <param name="steering">
@@ -155,14 +158,15 @@ public sealed class Simulator
         var ch = p.Chassis;
         double aeroN = -0.5 * p.Environment.AirDensityKgM3 * ch.DragAreaM2 * _v * Math.Abs(_v);
         double externalN = gravityN + aeroN;
-        double brakeN = Math.Max(brakePedal * ch.MaxBrakeForceN, _hillHold.ForceN)
-            + (input.Handbrake ? ch.HandbrakeForceN : 0);
-        double vehicleFrictionN = ch.RollingResistanceCoeff * mass * gravity * Math.Cos(slope) + brakeN;
+        double footBrakeN = Math.Max(brakePedal * ch.MaxBrakeForceN, _hillHold.ForceN);
+        double handbrakeN = input.Handbrake ? ch.HandbrakeForceN : 0;
+        double rollingN = ch.RollingResistanceCoeff * mass * gravity * Math.Cos(slope);
+        double vehicleFrictionN = rollingN + footBrakeN + handbrakeN;
 
         double clutchCapacity = engagement * p.Clutch.MaxTorqueNm * ClutchFrictionFactor(p);
         var gb = p.Gearbox;
         double previousSpeed = _v;
-        double clutchTorque;
+        double clutchTorque = 0;
 
         if (_gear == Gear.Neutral)
         {
@@ -170,21 +174,64 @@ public sealed class Simulator
                 gb.InputShaftInertiaKgM2, 0, gb.InputShaftDragNm, clutchCapacity, dt);
             _v = Friction.Advance(_v, externalN, vehicleFrictionN, mass, dt);
             _driveForceN = 0;
+            _wheelSlip = false; // the driven wheels roll free with the car
         }
         else
         {
-            // Vehicle reflected to the input shaft: ω_t = k·v, F_drive = T·k·η.
             double k = InputShaftPerMetre(_gear);
             double eta = gb.Efficiency;
-            double reflectedInertia = gb.InputShaftInertiaKgM2 + mass / (k * k * eta);
-            double reflectedLoad = externalN / (k * eta);
-            double reflectedFriction = vehicleFrictionN / (Math.Abs(k) * eta) + gb.InputShaftDragNm;
-            _wIn = k * _v;
-            clutchTorque = SolveClutch(e.InertiaKgM2, engineActive, engineFriction,
-                reflectedInertia, reflectedLoad, reflectedFriction, clutchCapacity, dt);
-            _v = _wIn / k;
-            _driveForceN = clutchTorque * k * eta;
+            var t = p.Traction;
+            // Brake force on the driven wheels acts through their tyres; the rest acts on the body directly.
+            double drivenBrakeN = footBrakeN * (t.RearWheelDrive ? 1 - t.FrontBrakeShare : t.FrontBrakeShare)
+                                  + (t.RearWheelDrive ? handbrakeN : 0);
+            double drivenLoadN = DrivenAxleLoad(p, slope);
+            bool slid = false;
+            if (!_wheelSlip)
+            {
+                // Gripping: vehicle reflected to the input shaft, ω_t = k·v, F_drive = T·k·η.
+                double weBefore = _we, vBefore = _v;
+                bool lockedBefore = _clutchLocked;
+                double reflectedInertia = gb.InputShaftInertiaKgM2 + mass / (k * k * eta);
+                double reflectedLoad = externalN / (k * eta);
+                double reflectedFriction = vehicleFrictionN / (Math.Abs(k) * eta) + gb.InputShaftDragNm;
+                _wIn = k * _v;
+                double wInBefore = _wIn;
+                clutchTorque = SolveClutch(e.InertiaKgM2, engineActive, engineFriction,
+                    reflectedInertia, reflectedLoad, reflectedFriction, clutchCapacity, dt);
+                // The force the driven tyres had to pass to the road: what the shaft delivers, less what the
+                // driven wheels' brakes absorb (at rest they absorb as much as they can).
+                double shaftAccel = (_wIn - wInBefore) / dt;
+                double drag = gb.InputShaftDragNm * Friction.Sign(_wIn);
+                double shaftForceN = (clutchTorque - gb.InputShaftInertiaKgM2 * shaftAccel - drag) * k * eta;
+                double brakeOnTyresN = _wIn == 0 ? Math.Clamp(shaftForceN, -drivenBrakeN, drivenBrakeN) : drivenBrakeN * Friction.Sign(_wIn / k);
+                double tyreForceN = shaftForceN - brakeOnTyresN;
+                if (Math.Abs(tyreForceN) <= t.PeakMu * drivenLoadN)
+                {
+                    _v = _wIn / k;
+                    _driveForceN = clutchTorque * k * eta;
+                }
+                else
+                {
+                    // Past the grip limit: undo the step and take it again with the tyres sliding.
+                    _we = weBefore;
+                    _v = vBefore;
+                    _wIn = wInBefore;
+                    _clutchLocked = lockedBefore;
+                    _wheelSlip = true;
+                    clutchTorque = SlideStep(p, k, eta, Friction.Sign(tyreForceN), drivenLoadN, drivenBrakeN,
+                        engineActive, engineFriction, clutchCapacity, externalN, rollingN + footBrakeN + handbrakeN - drivenBrakeN, dt);
+                    slid = true;
+                }
+            }
+            if (_wheelSlip && !slid)
+            {
+                double slipDirection = Friction.Sign(_wIn / k - _v);
+                clutchTorque = SlideStep(p, k, eta, slipDirection, drivenLoadN, drivenBrakeN,
+                    engineActive, engineFriction, clutchCapacity, externalN, rollingN + footBrakeN + handbrakeN - drivenBrakeN, dt);
+            }
         }
+        double accel = (_v - previousSpeed) / dt;
+        _transferAccel += (accel - _transferAccel) * Math.Min(1, dt / p.Traction.WeightTransferTimeConstantS);
 
         UpdateTemperatures(p, clutchTorque, combustion, dt);
         _x += _v * dt;
@@ -194,7 +241,54 @@ public sealed class Simulator
 
         double idleUsage = ic.MaxTorqueNm > 0 ? idleTorque / ic.MaxTorqueNm : 1;
         State = BuildState(grade, throttle, idleTorque, idleUsage, combustion + pulsation, engineFriction,
-            shudderIntensity, engagement, clutchTorque, firing, (_v - previousSpeed) / dt);
+            shudderIntensity, engagement, clutchTorque, firing, accel);
+    }
+
+    /// <summary>
+    /// Normal load on the driven axle: its static share of the weight, plus the load the road's slope
+    /// and the car's acceleration move rearwards through the centre of gravity's height (M12).
+    /// </summary>
+    private double DrivenAxleLoad(VehicleParams p, double slope)
+    {
+        var st = p.Steering;
+        double weight = p.Chassis.MassKg * p.Environment.GravityMps2;
+        double rearStatic = weight * Math.Cos(slope) * st.CgToFrontAxleM / st.WheelbaseM;
+        double rearwards = (p.Chassis.MassKg * _transferAccel + weight * Math.Sin(slope)) * p.Traction.CgHeightM / st.WheelbaseM;
+        double rear = rearStatic + rearwards, front = weight * Math.Cos(slope) - rear;
+        return Math.Max(0, p.Traction.RearWheelDrive ? rear : front);
+    }
+
+    /// <summary>
+    /// One step with the driven tyres sliding (M12): they pass slidingMu x load to the road, against the
+    /// slip. The driveline (input shaft and driven wheels) and the body move separately; the tyres grip
+    /// again when the slip speed crosses zero, sharing momentum as the clutch plates do.
+    /// </summary>
+    /// <param name="bodyFrictionN">Rolling resistance and the brakes on the wheels that are not driven.</param>
+    private double SlideStep(VehicleParams p, double k, double eta, double slipDirection, double drivenLoadN,
+        double drivenBrakeN, double engineActive, double engineFriction, double clutchCapacity, double externalN,
+        double bodyFrictionN, double dt)
+    {
+        var gb = p.Gearbox;
+        var t = p.Traction;
+        double ratio = Math.Abs(k) * p.Chassis.TyreCircumferenceM / (2 * Math.PI); // gearbox x final drive
+        double drivelineInertia = gb.InputShaftInertiaKgM2 + t.DrivenWheelInertiaKgM2 / (ratio * ratio);
+        double tyreForceN = slipDirection * t.SlidingMu * drivenLoadN;
+        double clutchTorque = SolveClutch(p.Engine.InertiaKgM2, engineActive, engineFriction,
+            drivelineInertia, -tyreForceN / (k * eta), gb.InputShaftDragNm + drivenBrakeN / (Math.Abs(k) * eta), clutchCapacity, dt);
+        _v = Friction.Advance(_v, externalN + tyreForceN, bodyFrictionN, p.Chassis.MassKg, dt);
+        _driveForceN = tyreForceN;
+
+        if (Friction.Sign(_wIn / k - _v) != slipDirection)
+        {
+            // The slip speed crossed zero: the tyres grip, wheels and body share their momentum.
+            double driveline = (drivelineInertia + (_clutchLocked ? p.Engine.InertiaKgM2 : 0)) * k * k * eta;
+            double mass = p.Chassis.MassKg;
+            _v = (mass * _v + driveline * (_wIn / k)) / (mass + driveline);
+            _wIn = k * _v;
+            if (_clutchLocked) _we = _wIn;
+            _wheelSlip = false;
+        }
+        return clutchTorque;
     }
 
     /// <summary>0 when warm, rising linearly to 1 at the cold reference temperature.</summary>
@@ -302,6 +396,7 @@ public sealed class Simulator
             _gear = shifter;
             _grinding = false;
             _clutchLocked = false;
+            _wheelSlip = false;
             _wIn = InputShaftPerMetre(shifter) * _v;
         }
         else
@@ -446,6 +541,8 @@ public sealed class Simulator
             LateralAccelMps2 = _lateralAccel,
             RoadWheelAngleDeg = _roadWheelDeg,
             FrontSliding = _frontSliding,
+            WheelSlip = _wheelSlip,
+            DrivenWheelSpeedMps = _wheelSlip && _gear != Gear.Neutral ? _wIn / InputShaftPerMetre(_gear) : _v,
             AligningTorqueNm = _aligningTorqueNm,
         };
     }
