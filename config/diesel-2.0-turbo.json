@@ -104,6 +104,8 @@
     "mechanicalTrailM": 0.02,
     "pneumaticTrailM": 0.03,
     "pneumaticTrailFadeRatio": 0.3,
-    "powerAssistFactor": 0.22
+    "powerAssistFactor": 0.22,
+    "centringLeverM": 0.012,
+    "centringFullSpeedMps": 1.5
   }
 }

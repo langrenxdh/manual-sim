@@ -238,7 +238,8 @@ public sealed class Simulator
     /// <summary>
     /// Kinematic single-track step (M9b). The road-wheel angle sets the path curvature; lateral
     /// acceleration is capped by tyre grip (understeer beyond it). The front lateral force times the
-    /// trail gives the aligning torque; the pneumatic trail fades as the front tyres slide.
+    /// trail gives the aligning torque; the pneumatic trail fades as the front tyres slide. Steering
+    /// geometry adds a centring torque from the road-wheel angle while rolling.
     /// </summary>
     private void UpdateLateral(VehicleParams p, double steeringWheelDeg, double dt)
     {
@@ -260,8 +261,13 @@ public sealed class Simulator
         double frontLateralN = frontShare * p.Chassis.MassKg * _lateralAccel;
         double excess = Math.Max(0, Math.Abs(demand) / limit - 1);
         double trail = st.MechanicalTrailM + st.PneumaticTrailM * Math.Clamp(1 - excess / st.PneumaticTrailFadeRatio, 0, 1);
+        double tyreNm = frontLateralN * trail * Math.Sign(_v == 0 ? 1 : _v);
+        // Caster and kingpin inclination lift the front as the wheels turn; rolling lets them settle back.
+        double frontLoadN = frontShare * p.Chassis.MassKg * p.Environment.GravityMps2;
+        double rolling = Math.Clamp(Math.Abs(_v) / st.CentringFullSpeedMps, 0, 1);
+        double centringNm = frontLoadN * st.CentringLeverM * Math.Sin(_roadWheelDeg * Math.PI / 180) * rolling;
         // Pushes the wheel back towards straight: opposite in sign to a forward turn.
-        _aligningTorqueNm = -st.PowerAssistFactor * frontLateralN * trail / st.SteeringRatio * Math.Sign(_v == 0 ? 1 : _v);
+        _aligningTorqueNm = -st.PowerAssistFactor * (tyreNm + centringNm) / st.SteeringRatio;
     }
 
     /// <summary>Gearbox input shaft rad/s per m/s of vehicle speed for a gear (negative in reverse).</summary>

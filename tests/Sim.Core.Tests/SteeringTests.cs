@@ -65,6 +65,23 @@ public class SteeringTests
         Assert.True(Math.Abs(sliding.AligningTorqueNm) < Math.Abs(firmer.AligningTorqueNm), "past the limit the wheel goes light");
     }
 
+    /// <summary>
+    /// T17: at parking and roundabout speeds, where the tyre force is small, steering geometry still pulls
+    /// the wheel back to straight; at a standstill nothing moves it.
+    /// </summary>
+    [Fact]
+    public void T17_LowSpeed_WheelReturnsTowardsCentre_StandstillHoldsIt()
+    {
+        var left = Roll(Gear.First, 7, 180, 1)[^1];
+        var right = Roll(Gear.First, 7, -180, 1)[^1];
+        var parked = Script.Run(new Simulator(Golf_, Road.Flat(), Gear.Neutral, steering: true), 1,
+            _ => new DriverInput(0, 0, 1, Gear.Neutral, SteeringWheelDeg: 180))[^1];
+
+        Assert.True(left.AligningTorqueNm <= -0.3, $"left lock at 7 km/h: {left.AligningTorqueNm:F2} Nm towards centre");
+        Assert.Equal(-left.AligningTorqueNm, right.AligningTorqueNm, 6);
+        Assert.Equal(0, parked.AligningTorqueNm, 12);
+    }
+
     /// <summary>T16: with steering off (the hill road and every older test) the car runs straight along the road.</summary>
     [Fact]
     public void T16_SteeringOff_IgnoresTheWheel_AndPoseFollowsTheRoad()

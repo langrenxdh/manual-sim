@@ -88,6 +88,8 @@ public sealed record VehicleParams
         Require(st.MechanicalTrailM >= 0 && st.PneumaticTrailM >= 0, "steering trails must be >= 0");
         Positive(st.PneumaticTrailFadeRatio, "steering.pneumaticTrailFadeRatio");
         Require(st.PowerAssistFactor is > 0 and <= 1, "steering.powerAssistFactor must be in (0, 1]");
+        Require(st.CentringLeverM >= 0, "steering.centringLeverM must be >= 0");
+        Positive(st.CentringFullSpeedMps, "steering.centringFullSpeedMps");
     }
 
     private static void Positive(double value, string name) => Require(value > 0, $"{name} must be > 0");
@@ -225,7 +227,9 @@ public sealed record EngineThermalParams
 /// The path curvature follows the road-wheel angle until lateral acceleration reaches
 /// <see cref="TyreGripMu"/> x g, beyond which the car understeers. The self-aligning torque felt at the
 /// steering wheel is the front lateral force times the trail, through the ratio and the power assist;
-/// the pneumatic trail fades once the front tyres slide, so the wheel goes light.
+/// the pneumatic trail fades once the front tyres slide, so the wheel goes light. Caster and kingpin
+/// inclination add a centring torque from the steering angle itself (turning the wheels lifts the front),
+/// which returns the wheel at parking and roundabout speeds where the tyre force is small.
 /// </summary>
 public sealed record SteeringParams
 {
@@ -245,6 +249,16 @@ public sealed record SteeringParams
     public required double PneumaticTrailFadeRatio { get; init; }
     /// <summary>Share of the aligning torque the driver feels through the power steering.</summary>
     public required double PowerAssistFactor { get; init; }
+    /// <summary>
+    /// Geometric centring (caster and kingpin inclination): kingpin torque = front axle load x this lever
+    /// x sin(road-wheel angle).
+    /// </summary>
+    public required double CentringLeverM { get; init; }
+    /// <summary>
+    /// Speed at which the geometric centring is fully felt; it fades to nothing at a standstill, where
+    /// the tyres' scrub holds the wheels where they are.
+    /// </summary>
+    public required double CentringFullSpeedMps { get; init; }
 }
 
 /// <summary>Air-conditioning compressor (M7): a load torque on the crank and an ECU idle raise while on.</summary>
