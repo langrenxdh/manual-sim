@@ -12,7 +12,8 @@ using static Raylib_cs.Raylib;
 // (also triangle), T teaching mode (also O), V car, C air-con, F mirrors, B overhead view (town map),
 // F2 first-time setup, F11 borderless fullscreen,
 // E also lists the exams (Enter between exam parts), Esc leaves an exercise or exam, otherwise quits.
-// --screenshot FILE [--panel] [--hill] [--replay] [--teaching] [--setup] [--menu] [--progress] [--town] [--overhead] [--fov DEG] [--language zh|en] [--exercise ID] [--frames N] [--size WxH]:
+// K leaderboard; the exercise menu also changes the driver (M11).
+// --screenshot FILE [--panel] [--hill] [--replay] [--teaching] [--setup] [--menu] [--progress] [--town] [--overhead] [--fov DEG] [--drivers] [--leaderboard] [--language zh|en] [--exercise ID] [--frames N] [--size WxH]:
 // save a frame after start-up and exit (checks the visuals without a person). --hill and
 // --exercise ID also work on their own.
 string? screenshotPath = args.Length >= 2 && args[0] == "--screenshot" ? Path.GetFullPath(args[1]) : null;
@@ -54,7 +55,22 @@ void ToggleLanguage()
 string dataRoot = screenshotPath != null
     ? Path.Combine(Path.GetTempPath(), "manual-sim-screenshot-data")
     : Path.GetFullPath(Path.Combine(config.Directory, ".."));
-var scoreHistory = new ScoreHistory(Path.Combine(dataRoot, "scores"));
+// Drivers (M11): each has their own scores; the first driver owns scores/ itself (older scores included).
+string scoresRoot = Path.Combine(dataRoot, "scores");
+var drivers = new DriverProfiles(scoresRoot);
+var driver = drivers.Last;
+var scoreHistory = new ScoreHistory(driver != null ? drivers.DirectoryOf(driver) : scoresRoot);
+var driverPicker = new DriverPicker();
+var leaderboard = new Leaderboard();
+if (driver != null) leaderboard.Refresh(drivers, driver, scoreHistory);
+
+void UseDriver(DriverProfiles.Driver d)
+{
+    driver = d;
+    drivers.Choose(d);
+    scoreHistory = new ScoreHistory(drivers.DirectoryOf(d));
+    leaderboard.Refresh(drivers, d, scoreHistory);
+}
 var exerciseUi = new ExerciseUi();
 ExerciseDef? activeExercise = null; // null = free driving
 ExamRun? examRun = null;             // set while an exam (M8) is being driven
@@ -265,6 +281,9 @@ var setupScreen = new SetupScreen(engineSound, s =>
 });
 // Open setup on first run, but not in unattended screenshot runs unless asked for.
 if (screenshotPath == null ? !setupDone : args.Contains("--setup")) setupScreen.Open(setup);
+// Who is driving: asked at every start (Enter keeps the last driver), but not in unattended screenshot runs.
+if (screenshotPath == null || args.Contains("--drivers")) driverPicker.Show(drivers, driver);
+if (args.Contains("--leaderboard")) leaderboard.Open = true;
 SetExitKey(KeyboardKey.Null); // Esc cancels setup when it is open, otherwise quits (below)
 
 while (!WindowShouldClose())
@@ -276,6 +295,15 @@ while (!WindowShouldClose())
         if (IsKeyPressed(KeyboardKey.Escape)) setupScreen.Cancel();
         setupScreen.Update(buttons, GetFrameTime());
     }
+    else if (driverPicker.Open)
+    {
+        if (driverPicker.Update(drivers, buttons) is { } chosenDriver) UseDriver(chosenDriver);
+    }
+    else if (leaderboard.Open)
+    {
+        exerciseUi.UpdateMenu(exercises, buttons, out _, out _); // keeps D-pad edge tracking current
+        if (IsKeyPressed(KeyboardKey.Escape) || IsKeyPressed(KeyboardKey.K)) leaderboard.Open = false;
+    }
     else if (exerciseUi.MenuOpen)
     {
         if (IsKeyPressed(KeyboardKey.Escape) || IsKeyPressed(KeyboardKey.E)) exerciseUi.MenuOpen = false;
@@ -284,6 +312,8 @@ while (!WindowShouldClose())
             case ExerciseUi.MenuChoice.Exercise: StartExercise(chosen!); break;
             case ExerciseUi.MenuChoice.Exam: StartExam(chosenExam!); break;
             case ExerciseUi.MenuChoice.Progress: progressOpen = true; break;
+            case ExerciseUi.MenuChoice.Leaderboard: leaderboard.Open = true; break;
+            case ExerciseUi.MenuChoice.ChangeDriver: driverPicker.Show(drivers, driver); break;
             case ExerciseUi.MenuChoice.FreeDriving: Restart(hill: false); break;
         }
     }
@@ -324,6 +354,7 @@ while (!WindowShouldClose())
         if (IsKeyPressed(KeyboardKey.C)) physics.AirConOn = !physics.AirConOn;
         if (IsKeyPressed(KeyboardKey.F)) driverAids.MirrorsOn = !driverAids.MirrorsOn;
         if (IsKeyPressed(KeyboardKey.B)) driverAids.OverheadOn = !driverAids.OverheadOn;
+        if (IsKeyPressed(KeyboardKey.K)) leaderboard.Open = true;
         if (IsKeyPressed(KeyboardKey.F2)) setupScreen.Open(setup);
         if (buttons.HillStart && !previousButtons.HillStart) RestartOrRetry(hill: true);
         if (buttons.Replay && !previousButtons.Replay) ToggleReplay(frame.Exercise.Result);
@@ -396,17 +427,19 @@ while (!WindowShouldClose())
         eye = sceneView.Draw(frame.State, viewRect, frame.Exercise.Live.LeadPositionM, frame.Exercise.Live.LeadBraking, Cockpit);
         world = sceneView;
     }
-    if (!replayOpen && !progressOpen)
+    if (!replayOpen && !progressOpen && !leaderboard.Open)
     {
         driverAids.DrawMirrors(world, eye, frame.State, camera, carOutline, viewRect);
         if (frame.State.Steering) driverAids.DrawOverhead(world, frame.State, camera, carOutline, viewRect);
     }
     parkPilot.Update(parking, town, carOutline, frame.State, GetFrameTime());
-    if (!replayOpen && !progressOpen) parkPilot.Draw(parking, viewRect);
+    if (!replayOpen && !progressOpen && !leaderboard.Open) parkPilot.Draw(parking, viewRect);
     var roadArea = new Rectangle(viewArea.X, viewArea.Y, viewArea.Width, roadHeight);
     if (teaching && !replayOpen) TeachingOverlay.Draw(frame, vehicle, roadArea);
     if (progressOpen)
         ProgressView.Draw(exercises, scoreHistory, roadArea);
+    else if (leaderboard.Open)
+        leaderboard.Draw(exercises, roadArea);
     else if (replayOpen && replayAttempt != null)
         AttemptReplayView.Draw(replayAttempt, scoreHistory.Ghost(replayAttempt.ExerciseId), exercises.Coaching,
             roadArea, vehicle, Dashboard.TachMaxRpm);
@@ -420,7 +453,8 @@ while (!WindowShouldClose())
         if (examSummaryOpen && examRun != null) ExerciseUi.DrawExamSummary(examRun, exercises, centre);
         else
         {
-            ExerciseUi.DrawResult(frame.Exercise, scoreHistory, centre);
+            ExerciseUi.DrawResult(frame.Exercise, scoreHistory, centre,
+                frame.Exercise.Exercise is { } finished ? leaderboard.Record(finished.Id) : null, driver?.Name);
             if (examRun != null && frame.Exercise.Result != null) ExerciseUi.DrawExamProgress(examRun, centre);
         }
     }
@@ -431,8 +465,9 @@ while (!WindowShouldClose())
     Dashboard.Draw(frame, vehicle, scene.Dashboard, new Rectangle(viewArea.X, viewArea.Y + roadHeight, viewArea.Width, viewArea.Height - roadHeight));
     if (!panel.Visible)
         Ui.Text($"physics {frame.PhysicsHz:F0} Hz  overruns {frame.Overruns}   Tab: tuning panel   " +
-                $"M: {(onTown ? "hill road" : "town map")}   F: mirrors{(frame.State.Steering ? "   B: overhead" : "")}   L: Chinese", 8, h - 24, 18, Color.Gray);
+                $"{(driver != null ? driver.Name + "   " : "")}M: {(onTown ? "hill road" : "town map")}   F: mirrors{(frame.State.Steering ? "   B: overhead" : "")}   L: Chinese", 8, h - 24, 18, Color.Gray);
     panel.Draw(panelArea, frame, vehicle);
+    driverPicker.Draw(drivers, new Rectangle(0, 0, w, h));
     setupScreen.Draw(new Rectangle(0, 0, w, h));
 
     if (screenshotPath != null && args.Contains("--replay") && frameCount == screenshotFrame - 30 && !replayOpen)

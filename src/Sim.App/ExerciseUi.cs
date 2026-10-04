@@ -26,10 +26,12 @@ public sealed class ExerciseUi
 
     public bool MenuOpen { get; set; }
 
-    public enum MenuChoice { None, Exercise, Exam, Progress, FreeDriving }
+    public enum MenuChoice { None, Exercise, Exam, Progress, Leaderboard, ChangeDriver, FreeDriving }
 
-    /// <summary>Menu rows: the exercises, then the exams, then "Progress", then "Free driving".</summary>
-    private static int RowCount(ExerciseConfig c) => c.Exercises.Length + c.Exams.Length + 2;
+    /// <summary>Menu rows after the exercises and exams, in order.</summary>
+    private static readonly MenuChoice[] ExtraRows = [MenuChoice.Progress, MenuChoice.Leaderboard, MenuChoice.ChangeDriver, MenuChoice.FreeDriving];
+
+    private static int RowCount(ExerciseConfig c) => c.Exercises.Length + c.Exams.Length + ExtraRows.Length;
 
     /// <summary>Menu input; the chosen exercise or exam comes back through the out parameters.</summary>
     public MenuChoice UpdateMenu(ExerciseConfig config, UiButtons buttons, out ExerciseDef? exercise, out ExamDef? exam)
@@ -60,7 +62,7 @@ public sealed class ExerciseUi
             exam = config.Exams[_selected - n];
             return MenuChoice.Exam;
         }
-        return _selected == n + m ? MenuChoice.Progress : MenuChoice.FreeDriving;
+        return ExtraRows[_selected - n - m];
     }
 
     public void DrawMenu(ExerciseConfig config, ScoreHistory history, Rectangle area)
@@ -95,15 +97,17 @@ public sealed class ExerciseUi
                 Ui.Text(examBest, r.X + r.Width - 28 - Ui.Width(examBest, 17), y + 8, 17, history.Best(ExamHistoryId(x)) is null ? Muted : Good);
                 continue;
             }
-            if (i == n + exams)
+            if (i >= n + exams)
             {
-                Ui.Text("Progress", r.X + 28, y + 4, 24, Fg);
-                Ui.Text("Scores over time, trend and what most often costs points.", r.X + 28, y + 30, 15, Muted);
-                continue;
-            }
-            if (i == n + exams + 1)
-            {
-                Ui.Text("Free driving", r.X + 28, y + 14, 24, Fg);
+                var (title, detail) = ExtraRows[i - n - exams] switch
+                {
+                    MenuChoice.Progress => ("Progress", "Scores over time, trend and what most often costs points."),
+                    MenuChoice.Leaderboard => ("Leaderboard", "Every driver's best score, side by side."),
+                    MenuChoice.ChangeDriver => ("Change driver", "Pick who is driving, or add a new driver."),
+                    _ => ("Free driving", ""),
+                };
+                Ui.Text(title, r.X + 28, y + (detail.Length > 0 ? 4 : 14), 24, Fg);
+                if (detail.Length > 0) Ui.Text(detail, r.X + 28, y + 30, 15, Muted);
                 continue;
             }
             var e = config.Exercises[i];
@@ -138,7 +142,9 @@ public sealed class ExerciseUi
     }
 
     /// <summary>The result of the attempt that just ended.</summary>
-    public static void DrawResult(in ExerciseStatus x, ScoreHistory history, Rectangle area)
+    /// <param name="record">The best score of any driver (M11) and whose it is; shown when it is not the current driver's.</param>
+    public static void DrawResult(in ExerciseStatus x, ScoreHistory history, Rectangle area, (double Score, string Name)? record = null,
+        string? driverName = null)
     {
         if (x.Exercise is not { } e || x.Result is not { } res) return;
         float h = 210 + res.Penalties.Count * 30 + 60;
@@ -159,6 +165,11 @@ public sealed class ExerciseUi
         y += 82;
         string best = history.Best(e.Id) is double b ? $"Best: {b:F0}" : "Best: none completed yet";
         Ui.Text(best, x0, y, 18, Muted);
+        if (record is { } rec && rec.Name != driverName)
+        {
+            string recordText = $"Record: {rec.Score:F0} by {rec.Name}";
+            Ui.Text(recordText, r.X + r.Width - 28 - Ui.Width(recordText, 18), y, 18, Warn);
+        }
         y += 34;
 
         Ui.Text("metric", x0, y, 16, Muted);

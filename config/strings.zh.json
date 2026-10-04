@@ -201,6 +201,21 @@
   "F: mirrors": "F：后视镜",
   "B: overhead": "B：俯视图",
 
+  // ---- drivers and leaderboard (M11) -----------------------------------------------------------------
+  "Who is driving?": "谁在开？",
+  "Type a name, Backspace to correct, Enter to start": "输入名字，Backspace 修改，Enter 开始",
+  "Up/Down (or D-pad) select, Enter (or D-pad right) drive": "上/下（或十字键）选择，Enter（或十字键右）开始驾驶",
+  "Your existing scores will belong to this first driver.": "已有的成绩会归到这第一位驾驶员名下。",
+  "New driver": "新驾驶员",
+  "+ New driver": "+ 新驾驶员",
+  "Leaderboard": "排行榜",
+  "Best score of each driver.": "每位驾驶员的最好成绩。",
+  "K or Esc closes": "K 或 Esc 关闭",
+  "Every driver's best score, side by side.": "所有驾驶员的最好成绩并排比较。",
+  "Change driver": "换驾驶员",
+  "Pick who is driving, or add a new driver.": "选择谁在开，或者新加一位驾驶员。",
+  "Record: {0} by {1}": "纪录：{0}（{1}）",
+
   // ---- first-time setup -----------------------------------------------------------------------------
   "First-time setup": "首次设置",
   "Esc cancels; nothing is saved until the last step.": "Esc 取消；最后一步之前什么都不会保存。",
