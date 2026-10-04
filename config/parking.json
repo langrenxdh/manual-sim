@@ -1,0 +1,24 @@
+// Parking sensors (ParkPilot) on the town map (docs/design.md M9 决策记录; design.en.md M9 decision record).
+// Presentation only. Four sensors per bumper (inner ones at innerSensorShare of the half-width, corner ones
+// turned cornerAngleDeg outwards) look for the first point that is not road: parked cars, kerbs, car-park
+// edges, roundabout islands. In reverse front and rear work; driving forwards only the front, below
+// frontActiveBelowKmh. Beeps come faster as the obstacle nears (slowestPeriodS at the edge of the range down
+// to fastestPeriodS) and turn continuous below continuousBelowM: stop. Higher tone in front, lower behind.
+{
+  "enabled": true,
+  "sensors": {
+    "frontRangeM": 1.2,
+    "rearRangeM": 1.5,
+    "frontActiveBelowKmh": 10,
+    "innerSensorShare": 0.4,
+    "cornerAngleDeg": 30,
+    "stepM": 0.02
+  },
+  "frontToneHz": 1250,
+  "rearToneHz": 950,
+  "beepS": 0.07,
+  "slowestPeriodS": 0.6,
+  "fastestPeriodS": 0.12,
+  "continuousBelowM": 0.3,
+  "volume": 0.35
+}

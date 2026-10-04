@@ -9,9 +9,10 @@ using static Raylib_cs.Raylib;
 // Keys: Tab tuning panel, E exercises, R restart (the road start, or the current exercise),
 // H restart on the hill or the current exercise (also the right paddle), M hill road / town map (steering),
 // L Chinese / English, P replay of the last 10 s
-// (also triangle), T teaching mode (also O), V car, C air-con, F2 first-time setup, F11 borderless fullscreen,
+// (also triangle), T teaching mode (also O), V car, C air-con, F mirrors, B overhead view (town map),
+// F2 first-time setup, F11 borderless fullscreen,
 // E also lists the exams (Enter between exam parts), Esc leaves an exercise or exam, otherwise quits.
-// --screenshot FILE [--panel] [--hill] [--replay] [--teaching] [--setup] [--menu] [--progress] [--town] [--language zh|en] [--exercise ID] [--frames N] [--size WxH]:
+// --screenshot FILE [--panel] [--hill] [--replay] [--teaching] [--setup] [--menu] [--progress] [--town] [--overhead] [--fov DEG] [--language zh|en] [--exercise ID] [--frames N] [--size WxH]:
 // save a frame after start-up and exit (checks the visuals without a person). --hill and
 // --exercise ID also work on their own.
 string? screenshotPath = args.Length >= 2 && args[0] == "--screenshot" ? Path.GetFullPath(args[1]) : null;
@@ -19,6 +20,8 @@ bool screenshotPanel = args.Contains("--panel");
 int screenshotFrame = args.SkipWhile(a => a != "--frames").Skip(1).Select(int.Parse).FirstOrDefault(90);
 // --size WxH sets the initial window size (default 1600x900), e.g. to fit a smaller display.
 int[] windowSize = args.SkipWhile(a => a != "--size").Skip(1).Select(s => s.Split('x').Select(int.Parse).ToArray()).FirstOrDefault([1600, 900]);
+// --fov DEG fixes the vertical field of view (checks how the view looks on another screen setup).
+double? fovOverride = args.SkipWhile(a => a != "--fov").Skip(1).Select(double.Parse).Cast<double?>().FirstOrDefault();
 int frameCount = 0;
 
 var config = ConfigFiles.Locate();
@@ -31,6 +34,7 @@ var camera = CameraParams.FromJson(config.Read(ConfigFiles.CameraFile));
 var ffbParams = FfbParams.FromJson(config.Read(ConfigFiles.FfbFile));
 var exercises = ExerciseConfig.FromJson(config.Read(ConfigFiles.ExercisesFile));
 var town = TownMap.FromJson(config.Read(ConfigFiles.TownFile));
+var parking = ParkPilotParams.FromJson(config.Read(ConfigFiles.ParkingFile));
 // UI language (M10): English text everywhere, translated on drawing when Chinese is on.
 if (config.Exists(ConfigFiles.ChineseStringsFile)) Tr.LoadTable(config.Read(ConfigFiles.ChineseStringsFile));
 if (config.Exists(ConfigFiles.UiFile))
@@ -218,6 +222,9 @@ var panel = new TuningPanel(
     new TunableDocument("Exercises (apply to the next attempt)", ConfigFiles.ExercisesFile, typeof(ExerciseConfig),
         config.Read(ConfigFiles.ExercisesFile), ExerciseConfig.FromJson,
         o => exercises = (ExerciseConfig)o),
+    new TunableDocument("Parking sensors", ConfigFiles.ParkingFile, typeof(ParkPilotParams),
+        config.Read(ConfigFiles.ParkingFile), ParkPilotParams.FromJson,
+        o => parking = (ParkPilotParams)o),
     new TunableDocument("Cues (teaching mode)", ConfigFiles.CuesFile, typeof(CueConfig),
         config.Read(ConfigFiles.CuesFile), CueConfig.FromJson,
         o => { cueConfig = (CueConfig)o; cueVehicle = null; }),
@@ -236,6 +243,8 @@ SetTargetFPS(60);
 Ui.Load();
 sceneView = new SceneView(scene, camera);
 townView = new TownView(town, camera);
+var driverAids = new DriverAids { OverheadOn = args.Contains("--overhead") };
+var parkPilot = new ParkPilot();
 Restart(hill: false); // applies the scene's start temperature from the first drive
 if (args.Contains("--hill")) Restart(hill: true);
 if (args.Contains("--town")) ToggleTown();
@@ -313,6 +322,8 @@ while (!WindowShouldClose())
         if (IsKeyPressed(KeyboardKey.M) && examRun == null) ToggleTown();
         if (IsKeyPressed(KeyboardKey.L)) ToggleLanguage();
         if (IsKeyPressed(KeyboardKey.C)) physics.AirConOn = !physics.AirConOn;
+        if (IsKeyPressed(KeyboardKey.F)) driverAids.MirrorsOn = !driverAids.MirrorsOn;
+        if (IsKeyPressed(KeyboardKey.B)) driverAids.OverheadOn = !driverAids.OverheadOn;
         if (IsKeyPressed(KeyboardKey.F2)) setupScreen.Open(setup);
         if (buttons.HillStart && !previousButtons.HillStart) RestartOrRetry(hill: true);
         if (buttons.Replay && !previousButtons.Replay) ToggleReplay(frame.Exercise.Result);
@@ -365,20 +376,33 @@ while (!WindowShouldClose())
     BeginDrawing();
     ClearBackground(Color.Black);
     float roadHeight = viewArea.Height * RoadViewShare;
-    double? fov = setupDone ? setup.VerticalFovDeg(roadHeight, GetMonitorWidth(GetCurrentMonitor())) : null;
+    double? fov = fovOverride ?? (setupDone ? setup.VerticalFovDeg(roadHeight, GetMonitorWidth(GetCurrentMonitor())) : null);
     var viewRect = new Rectangle(viewArea.X, viewArea.Y, viewArea.Width, roadHeight);
+    var carOutline = exercises.TownCar!;
+    void Cockpit(Camera3D eye) => DriverAids.DrawCockpit(eye, camera, carOutline);
+    IWorldView world;
+    Camera3D eye;
     if (frame.State.Steering)
     {
         townView.Update(frame.State, GetFrameTime(), vehicle);
         townView.VerticalFovDeg = fov;
-        townView.Draw(frame.State, viewRect, frame.Exercise.FinishZone);
+        eye = townView.Draw(frame.State, viewRect, frame.Exercise.FinishZone, Cockpit);
+        world = townView;
     }
     else
     {
         sceneView.Update(frame.State, GetFrameTime(), vehicle);
         sceneView.VerticalFovDeg = fov;
-        sceneView.Draw(frame.State, viewRect, frame.Exercise.Live.LeadPositionM, frame.Exercise.Live.LeadBraking);
+        eye = sceneView.Draw(frame.State, viewRect, frame.Exercise.Live.LeadPositionM, frame.Exercise.Live.LeadBraking, Cockpit);
+        world = sceneView;
     }
+    if (!replayOpen && !progressOpen)
+    {
+        driverAids.DrawMirrors(world, eye, frame.State, camera, carOutline, viewRect);
+        if (frame.State.Steering) driverAids.DrawOverhead(world, frame.State, camera, carOutline, viewRect);
+    }
+    parkPilot.Update(parking, town, carOutline, frame.State, GetFrameTime());
+    if (!replayOpen && !progressOpen) parkPilot.Draw(parking, viewRect);
     var roadArea = new Rectangle(viewArea.X, viewArea.Y, viewArea.Width, roadHeight);
     if (teaching && !replayOpen) TeachingOverlay.Draw(frame, vehicle, roadArea);
     if (progressOpen)
@@ -407,7 +431,7 @@ while (!WindowShouldClose())
     Dashboard.Draw(frame, vehicle, scene.Dashboard, new Rectangle(viewArea.X, viewArea.Y + roadHeight, viewArea.Width, viewArea.Height - roadHeight));
     if (!panel.Visible)
         Ui.Text($"physics {frame.PhysicsHz:F0} Hz  overruns {frame.Overruns}   Tab: tuning panel   " +
-                $"M: {(onTown ? "hill road" : "town map")}   L: Chinese", 8, h - 24, 18, Color.Gray);
+                $"M: {(onTown ? "hill road" : "town map")}   F: mirrors{(frame.State.Steering ? "   B: overhead" : "")}   L: Chinese", 8, h - 24, 18, Color.Gray);
     panel.Draw(panelArea, frame, vehicle);
     setupScreen.Draw(new Rectangle(0, 0, w, h));
 
@@ -430,6 +454,8 @@ while (!WindowShouldClose())
 
 sceneView.Dispose();
 townView.Dispose();
+driverAids.Dispose();
+parkPilot.Dispose();
 engineSound?.Dispose();
 Ui.Unload();
 CloseWindow();

@@ -9,10 +9,11 @@ namespace Sim.App;
 /// <summary>
 /// The driver's view on the flat town map (M9c): roads, roundabouts, car parks with their bays and parked
 /// cars, and buildings off the road, seen from the car's world pose. Map X east / Y north become raylib X / -Z
-/// (Y is up). The geometry is built once per map; body pitch and judder shake come from
-/// <see cref="SceneView"/>'s camera settings. Presentation only.
+/// (Y is up). The geometry is built once per map and kept on the GPU, so mirrors and the overhead view can
+/// draw it again cheaply; body pitch and judder shake come from <see cref="SceneView"/>'s camera settings.
+/// Presentation only.
 /// </summary>
-public sealed class TownView : IDisposable
+public sealed class TownView : IWorldView, IDisposable
 {
     private const float LineWidth = 0.12f, MarkingLift = 0.01f, IslandLift = 0.15f;
     private const float DashLength = 3, DashPeriod = 12;
@@ -39,12 +40,13 @@ public sealed class TownView : IDisposable
         new(120, 110, 100, 255), new(140, 130, 115, 255), new(95, 105, 115, 255), new(60, 95, 60, 255),
     ];
 
-    private readonly List<(Vector3 A, Vector3 B, Vector3 C, Color Colour)> _triangles = [];
-    private readonly List<(Vector3 Centre, Vector3 Size, Color Colour)> _blocks = [];
+    private readonly StaticMesh _mesh = new();
+    private bool _uploaded;
     private RenderTexture2D _target;
     private bool _hasTarget;
     private double _bodyPitchRad, _bodyPitchRate;
     private uint _rng = 0xBEEF;
+    private double[]? _finishZone;
 
     public CameraParams Camera { get; set; }
     public double? VerticalFovDeg { get; set; }
@@ -83,8 +85,8 @@ public sealed class TownView : IDisposable
             double cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
             float w = (float)(maxX - minX), l = (float)(maxY - minY);
             var colour = CarColours[carIndex++ % CarColours.Length];
-            _blocks.Add((At(cx, cy, ParkedBodyHeight / 2 + 0.2f), new Vector3(w, ParkedBodyHeight, l), colour));
-            _blocks.Add((At(cx, cy, ParkedBodyHeight + 0.2f + ParkedCabinHeight / 2), new Vector3(w * 0.85f, ParkedCabinHeight, l * 0.5f), CarGlass));
+            _mesh.Box(At(cx, cy, ParkedBodyHeight / 2 + 0.2f), new Vector3(w, ParkedBodyHeight, l), colour);
+            _mesh.Box(At(cx, cy, ParkedBodyHeight + 0.2f + ParkedCabinHeight / 2), new Vector3(w * 0.85f, ParkedCabinHeight, l * 0.5f), CarGlass);
         }
 
         foreach (var (road, pts) in map.Expanded)
@@ -142,7 +144,7 @@ public sealed class TownView : IDisposable
                 float w = 6 + (h >> 12) % 12, d = 6 + (h >> 16) % 12, ht = 4 + (h >> 20) % 16;
                 double reach = Math.Max(w, d) / 2 + BlockClearanceM;
                 if (Near(map, cx, cy, reach)) continue;
-                _blocks.Add((At(cx, cy, ht / 2), new Vector3(w, ht, d), BlockColours[(h >> 26) % BlockColours.Length]));
+                _mesh.Box(At(cx, cy, ht / 2), new Vector3(w, ht, d), BlockColours[(h >> 26) % BlockColours.Length]);
             }
     }
 
@@ -170,11 +172,7 @@ public sealed class TownView : IDisposable
         }
     }
 
-    private void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Color colour)
-    {
-        _triangles.Add((a, b, c, colour));
-        _triangles.Add((a, c, d, colour));
-    }
+    private void Quad(Vector3 a, Vector3 b, Vector3 c, Vector3 d, Color colour) => _mesh.Quad(a, b, c, d, colour);
 
     /// <summary>Advances the camera's body-pitch model; call once per rendered frame.</summary>
     public void Update(in SimState s, double dtS, VehicleParams p)
@@ -193,23 +191,43 @@ public sealed class TownView : IDisposable
     }
 
     /// <param name="finishZone">A town exercise's goal [minX, minY, maxX, maxY], outlined on the ground; null for none.</param>
-    public void Draw(in SimState s, Rectangle area, double[]? finishZone = null)
+    /// <param name="extra3D">Drawn inside the driver's 3D view after the world (the cockpit), given the camera.</param>
+    /// <returns>The driver's camera used for this frame.</returns>
+    public Camera3D Draw(in SimState s, Rectangle area, double[]? finishZone = null, Action<Camera3D>? extra3D = null)
     {
         EnsureTarget((int)area.Width, (int)area.Height);
-        BeginTextureMode(_target);
+        var camera = BuildCamera(s);
+        _finishZone = finishZone;
+        Render(_target, camera, s, lookingBack: false, extra3D == null ? null : () => extra3D(camera));
+        var source = new Rectangle(0, 0, _target.Texture.Width, -_target.Texture.Height);
+        DrawTexturePro(_target.Texture, source, area, Vector2.Zero, 0, Color.White);
+        return camera;
+    }
+
+    /// <inheritdoc/>
+    public void Render(RenderTexture2D target, Camera3D camera, in SimState s, bool lookingBack, Action? extra3D)
+    {
+        if (!_uploaded)
+        {
+            _mesh.Upload();
+            _uploaded = true;
+        }
+        BeginTextureMode(target);
         ClearBackground(Sky);
-        BeginMode3D(BuildCamera(s));
+        BeginMode3D(camera);
         Rlgl.DisableBackfaceCulling();
-        foreach (var (a, b, c, colour) in _triangles) DrawTriangle3D(a, b, c, colour);
-        foreach (var (centre, size, colour) in _blocks) DrawCubeV(centre, size, colour);
-        if (finishZone is { } z) DrawZone(z);
+        _mesh.Draw();
+        if (_finishZone is { } z) DrawZone(z);
+        extra3D?.Invoke();
         Rlgl.DrawRenderBatchActive();
         Rlgl.EnableBackfaceCulling();
         EndMode3D();
         EndTextureMode();
-        var source = new Rectangle(0, 0, _target.Texture.Width, -_target.Texture.Height);
-        DrawTexturePro(_target.Texture, source, area, Vector2.Zero, 0, Color.White);
     }
+
+    /// <inheritdoc/>
+    public (Vector3 Ground, Vector3 Forward) CarPose(in SimState s) =>
+        (At(s.WorldX, s.WorldY), new Vector3((float)Math.Cos(s.HeadingRad), 0, (float)-Math.Sin(s.HeadingRad)));
 
     /// <summary>The goal outline: a band just inside the zone's edge, slightly above the markings.</summary>
     private static void DrawZone(double[] z)
@@ -230,7 +248,7 @@ public sealed class TownView : IDisposable
     {
         var c = Camera;
         double jitter = s.ShudderIntensity;
-        double pitch = _bodyPitchRad + jitter * c.ShakePitchDeg * Math.PI / 180 * NextSigned();
+        double pitch = _bodyPitchRad - c.LookDownDeg * Math.PI / 180 + jitter * c.ShakePitchDeg * Math.PI / 180 * NextSigned();
         double heading = s.HeadingRad;
         // Right-hand drive: the seat sits to the right of the car's centre line.
         double rx = Math.Sin(heading), ry = -Math.Cos(heading);
@@ -278,5 +296,6 @@ public sealed class TownView : IDisposable
     {
         if (_hasTarget) UnloadRenderTexture(_target);
         _hasTarget = false;
+        _mesh.Dispose();
     }
 }

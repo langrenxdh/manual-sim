@@ -1,6 +1,12 @@
 // Driver's-eye camera (docs/design.md, 反馈通道 / 画面; design.en.md, Feedback channels / Visuals).
 // Presentation only: reads physics state, never writes it. Body pitch is a spring-damper driven by
-// longitudinal acceleration (positive = nose up). Shake follows judder intensity.
+// longitudinal acceleration (positive = nose up). Shake follows judder intensity. lookDownDeg: the eyes rest
+// a little below the horizon, so with a true-to-scale field of view the bonnet and the road just ahead show.
+// cockpit: the own car's body seen from the seat, so its size reads on screen (bonnet, dashboard, A-pillars).
+// "Ahead" is metres forward of the eye, heights are above the ground; width and nose come from "townCar" in
+// exercises.json. mirrors: each drawn from its own camera at that spot on the car (lateral from the centre
+// line, + right; yawOutDeg turns it outwards from straight back), placed at screenX/screenY (share of the
+// road view) with widthShare of its width. F toggles the mirrors. overhead: the top-down view (B, town map).
 {
   "eyeHeightM": 1.2,
   "driverLateralOffsetM": 0.35,
@@ -10,5 +16,27 @@
   "bodyPitchDampingRatio": 0.35,
   "shakePitchDeg": 0.12,
   "shakeHeightM": 0.003,
-  "drawDistanceM": 600
+  "drawDistanceM": 600,
+  "lookDownDeg": 5,
+  "cockpit": {
+    "enabled": true,
+    "cowlAheadM": 1.0,
+    "cowlHeightM": 0.95,
+    "noseHeightM": 0.85,
+    "bonnetInsetM": 0.1,
+    "dashAheadM": 0.5,
+    "dashHeightM": 1.0,
+    "pillarTopAheadM": 0.3,
+    "pillarTopHeightM": 1.42,
+    "pillarWidthM": 0.08
+  },
+  "mirrors": [
+    { "name": "interior", "aheadM": 0.55, "lateralM": 0, "heightM": 1.32, "yawOutDeg": 0, "fovDeg": 16,
+      "screenX": 0.22, "screenY": 0.24, "widthShare": 0.2, "aspect": 3.6, "showsOwnCar": false },
+    { "name": "left", "aheadM": 0.75, "lateralM": -1.0, "heightM": 1.0, "yawOutDeg": 10, "fovDeg": 18,
+      "screenX": 0.07, "screenY": 0.72, "widthShare": 0.12, "aspect": 1.5, "showsOwnCar": true },
+    { "name": "right", "aheadM": 0.75, "lateralM": 1.0, "heightM": 1.0, "yawOutDeg": 10, "fovDeg": 18,
+      "screenX": 0.93, "screenY": 0.72, "widthShare": 0.12, "aspect": 1.5, "showsOwnCar": true }
+  ],
+  "overhead": { "spanM": 24, "sizeShare": 0.45, "screenX": 0.86, "screenY": 0.38 }
 }

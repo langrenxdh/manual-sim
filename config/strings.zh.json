@@ -198,6 +198,8 @@
   "M: town map": "M：城镇地图",
   "M: hill road": "M：坡道路",
   "L: Chinese": "L：English",
+  "F: mirrors": "F：后视镜",
+  "B: overhead": "B：俯视图",
 
   // ---- first-time setup -----------------------------------------------------------------------------
   "First-time setup": "首次设置",

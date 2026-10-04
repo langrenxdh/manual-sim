@@ -12,7 +12,7 @@ namespace Sim.App;
 /// with the road, with body pitch from longitudinal acceleration, and shakes with judder.
 /// World axes: X along the road (horizontal run), Y up, Z to the right. Presentation only.
 /// </summary>
-public sealed class SceneView : IDisposable
+public sealed class SceneView : IWorldView, IDisposable
 {
     // Road layout (metres). Driving on the left: the ego lane is centred on Z = 0, the dashed
     // centre line is on its right, then the opposite lane. Australian markings: 3 m dash, 9 m gap.
@@ -24,6 +24,8 @@ public sealed class SceneView : IDisposable
     private const float GroundHalfWidth = 400;
     private const float SegmentM = 2;
     private const float BehindM = 30;
+    /// <summary>How far behind the car the mirrors see.</summary>
+    private const float MirrorBehindM = 200;
     private const float MarkingLift = 0.01f;
     private const double ProfileStepM = 0.5;
     private const double ProfileLengthM = 20000;
@@ -54,6 +56,7 @@ public sealed class SceneView : IDisposable
     private uint _rng = 0xC0FFEE;
     private double? _leadRearM;
     private bool _leadBraking;
+    private float _behindM = BehindM;
 
     // Lead car (M6 traffic queue): a hatchback-sized box with a cabin, in the ego lane.
     private const float LeadLength = 4.3f, LeadWidth = 1.8f, BodyHeight = 0.75f, BodyClearance = 0.3f;
@@ -105,33 +108,54 @@ public sealed class SceneView : IDisposable
     }
 
     /// <param name="leadRearM">Rear bumper of an exercise's lead car (M6 queue), or null for none.</param>
-    public void Draw(in SimState s, Rectangle area, double? leadRearM = null, bool leadBraking = false)
+    /// <param name="extra3D">Drawn inside the driver's 3D view after the world (the cockpit), given the camera.</param>
+    /// <returns>The driver's camera used for this frame.</returns>
+    public Camera3D Draw(in SimState s, Rectangle area, double? leadRearM = null, bool leadBraking = false,
+        Action<Camera3D>? extra3D = null)
     {
         _leadRearM = leadRearM;
         _leadBraking = leadBraking;
         EnsureTarget((int)area.Width, (int)area.Height);
-        BeginTextureMode(_target);
-        ClearBackground(Sky);
-        BeginMode3D(BuildCamera(s));
-        Rlgl.DisableBackfaceCulling();
-        DrawRoad(s.PositionM);
-        DrawRoadside(s.PositionM);
-        DrawLeadCar();
-        Rlgl.DrawRenderBatchActive(); // the batch draws later; flush while culling is still off
-        Rlgl.EnableBackfaceCulling();
-        EndMode3D();
-        EndTextureMode();
+        var camera = BuildCamera(s);
+        Render(_target, camera, s, lookingBack: false, extra3D == null ? null : () => extra3D(camera));
 
         // Render textures are stored upside down: flip on the way out.
         var source = new Rectangle(0, 0, _target.Texture.Width, -_target.Texture.Height);
         DrawTexturePro(_target.Texture, source, area, Vector2.Zero, 0, Color.White);
+        return camera;
+    }
+
+    /// <inheritdoc/>
+    public void Render(RenderTexture2D target, Camera3D camera, in SimState s, bool lookingBack, Action? extra3D)
+    {
+        _behindM = lookingBack ? MirrorBehindM : BehindM;
+        BeginTextureMode(target);
+        ClearBackground(Sky);
+        BeginMode3D(camera);
+        Rlgl.DisableBackfaceCulling();
+        DrawRoad(s.PositionM);
+        DrawRoadside(s.PositionM);
+        DrawLeadCar();
+        extra3D?.Invoke();
+        Rlgl.DrawRenderBatchActive(); // the batch draws later; flush while culling is still off
+        Rlgl.EnableBackfaceCulling();
+        EndMode3D();
+        EndTextureMode();
+    }
+
+    /// <inheritdoc/>
+    public (Vector3 Ground, Vector3 Forward) CarPose(in SimState s)
+    {
+        var g = PointAt(s.PositionM);
+        double slope = Math.Atan(_grade.Evaluate(s.PositionM));
+        return (new Vector3(g.X, g.Y, 0), new Vector3((float)Math.Cos(slope), (float)Math.Sin(slope), 0));
     }
 
     private Camera3D BuildCamera(in SimState s)
     {
         var c = Camera;
         double jitter = s.ShudderIntensity;
-        double pitch = Math.Atan(_grade.Evaluate(s.PositionM)) + _bodyPitchRad
+        double pitch = Math.Atan(_grade.Evaluate(s.PositionM)) + _bodyPitchRad - c.LookDownDeg * Math.PI / 180
                        + jitter * c.ShakePitchDeg * Math.PI / 180 * NextSigned();
         var ground = PointAt(s.PositionM);
         var eye = new Vector3(ground.X, ground.Y + (float)(c.EyeHeightM + jitter * c.ShakeHeightM * NextSigned()),
@@ -151,7 +175,7 @@ public sealed class SceneView : IDisposable
     {
         float roadLeft = -LaneWidth / 2 - Shoulder, roadRight = LaneWidth * 1.5f + Shoulder;
         float leftLine = -LaneWidth / 2, centreLine = LaneWidth / 2, rightLine = LaneWidth * 1.5f;
-        double start = Math.Floor((position - BehindM) / SegmentM) * SegmentM;
+        double start = Math.Floor((position - _behindM) / SegmentM) * SegmentM;
         double end = position + Camera.DrawDistanceM;
 
         for (double a = start; a < end; a += SegmentM)
@@ -176,7 +200,7 @@ public sealed class SceneView : IDisposable
         double end = position + Camera.DrawDistanceM;
         float leftLine = -LaneWidth / 2, rightLine = LaneWidth * 1.5f;
 
-        for (double s = Math.Ceiling((position - BehindM) / PoleSpacing) * PoleSpacing; s < end; s += PoleSpacing)
+        for (double s = Math.Ceiling((position - _behindM) / PoleSpacing) * PoleSpacing; s < end; s += PoleSpacing)
         {
             var g = PointAt(s);
             var basePos = new Vector3(g.X, g.Y, leftLine - PoleOffset);
@@ -184,21 +208,21 @@ public sealed class SceneView : IDisposable
             DrawCube(basePos + new Vector3(0, PoleHeight, 1.2f), 0.15f, 0.15f, 2.4f, Pole);
         }
 
-        for (double s = Math.Ceiling((position - BehindM) / RailPostSpacing) * RailPostSpacing;
+        for (double s = Math.Ceiling((position - _behindM) / RailPostSpacing) * RailPostSpacing;
              s < position + RailDrawM; s += RailPostSpacing)
         {
             var g = PointAt(s);
             DrawCube(new Vector3(g.X, g.Y + RailPostHeight / 2, rightLine + RailPostOffset), 0.12f, RailPostHeight, 0.12f, RailPost);
         }
 
-        for (double s = Math.Ceiling((position - BehindM) / DelineatorSpacing) * DelineatorSpacing; s < end; s += DelineatorSpacing)
+        for (double s = Math.Ceiling((position - _behindM) / DelineatorSpacing) * DelineatorSpacing; s < end; s += DelineatorSpacing)
         {
             var g = PointAt(s);
             DrawCube(new Vector3(g.X, g.Y + DelineatorHeight / 2, leftLine - DelineatorOffset), 0.1f, DelineatorHeight, 0.1f, Marking);
         }
 
         // Distant blocks (buildings, tree lines) for horizon reference, fixed per 60 m cell.
-        for (long cell = (long)Math.Floor((position - BehindM) / BlockCellM); cell * BlockCellM < end; cell++)
+        for (long cell = (long)Math.Floor((position - _behindM) / BlockCellM); cell * BlockCellM < end; cell++)
         {
             uint h = Hash((uint)cell);
             float s = (float)(cell * BlockCellM + h % 40);
