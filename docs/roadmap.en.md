@@ -27,6 +27,9 @@ v1 (M0–M3) is complete, and M4 (graded exercises and scoring) is built. This d
 | 13 | Cold engine (higher, less stable idle) and air-con load at idle | Fidelity |
 | 14 | Other cars: more vehicle configs and a car menu | Fidelity |
 | 15 | Sharing: installer, setup for other wheels and pedals, Chinese/English UI | Sharing |
+| 16 | Driver profiles: scores, ghosts and history kept per driver, compared on a leaderboard | Backlog (to discuss) |
+| 17 | Performance cars (for example a Mustang, a Honda Type R) with their own specs and engine/exhaust sound | Backlog (to discuss) |
+| 18 | Gear-grind sound, alongside the grind felt in the wheel | Backlog (to discuss) |
 
 ## Order and reasoning
 
@@ -107,6 +110,14 @@ Split into steps, each with its own gate:
 - Input setup wizard for other wheels and pedals: detect axes and buttons by asking the user to press each one (generalising `HwProbe watch`), write a `config/<device>.json`; force feedback optional.
 - Chinese/English UI: string tables, font with CJK glyphs.
 - **Gate:** a friend installs it on their own PC and wheel and drives without help.
+
+## Backlog — to discuss before planning
+
+Added 2026-10-04. Not scheduled yet: each is discussed first, then gets a milestone with a gate like the others.
+
+- **Driver profiles (16):** pick or create a driver at start (and from the menu). Each driver has their own `scores/<driver>/` (history, ghosts, exam results), so several people can share one PC. A leaderboard compares drivers per exercise and exam (best, recent average), and the replay could show another driver's ghost to race against. To discuss: how a driver is chosen with the wheel only (D-pad list), whether today's scores become the first profile (they must be kept: they are the owner's real data), and whether settings such as teaching mode are per driver.
+- **Performance cars (17):** more vehicle files beside the Golf, the diesel and the small petrol, for example a Ford Mustang GT (5.0 V8, rear-wheel drive, 6-speed manual) and a Honda Civic Type R (2.0 turbo, high revs, 6-speed). Each with its own engine curves, inertia, redline, gear ratios, clutch, mass, tyres and steering, from published figures and tuned by plausibility. Each also gets its own sound profile (firing order and cylinder count, exhaust note, induction and turbo or not), so `engine-sound.json` becomes per car. To discuss: rear-wheel drive and wheelspin need a longitudinal tyre slip model the physics does not have yet (today the tyres never slip lengthwise); whether a car may also change the force feedback (heavier steering, stronger judder); which cars first.
+- **Gear-grind sound (18):** today grinding is only felt (80 Hz buzz in the wheel). Add a synthesised grinding sound in the audio callback while `Grinding` is set: a harsh, noisy, metallic rasp whose pitch follows the speed difference between the gear being forced in and the input shaft, in the engine sound's mix with its own gain in the panel. It follows the physics flag, no special rule.
 
 ## Notes for every milestone
 
