@@ -1,5 +1,13 @@
-// Cars offered in the car menu (V). Each entry is a vehicle file in this folder (M7).
+// Cars offered in the car menu (V, M7). Each entry names a vehicle file (physics) and its engine sound file
+// (M12), both in this folder.
 {
-  "cars": ["golf-110tsi.json", "small-na-1.5.json", "diesel-2.0-turbo.json",
-           "mustang-gt.json", "civic-type-r.json", "gr86.json", "mx5.json"]
+  "cars": [
+    { "vehicle": "golf-110tsi.json", "sound": "engine-sound.json" },
+    { "vehicle": "small-na-1.5.json", "sound": "sound-small-na.json" },
+    { "vehicle": "diesel-2.0-turbo.json", "sound": "sound-diesel.json" },
+    { "vehicle": "mustang-gt.json", "sound": "sound-mustang-gt.json" },
+    { "vehicle": "civic-type-r.json", "sound": "sound-civic-type-r.json" },
+    { "vehicle": "gr86.json", "sound": "sound-gr86.json" },
+    { "vehicle": "mx5.json", "sound": "sound-mx5.json" }
+  ]
 }

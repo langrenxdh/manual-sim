@@ -1,0 +1,26 @@
+// Engine sound for the MX-5's 2.0 four (M12): a light, buzzy, free-revving four with a crisp intake and
+// exhaust; no turbo. Fields as in engine-sound.json.
+{
+  "masterGain": 0.7,
+  "harmonics": [[1, 0.1], [2, 1.0], [3, 0.45], [4, 0.6], [5, 0.25], [6, 0.3], [8, 0.15]],
+  "loadReferenceNm": 220,
+  "idleLoudness": 0.45,
+  "loadLoudness": 0.55,
+  "loadBrightness": 0.9,
+  "lugModulationDepth": 0.7,
+  "lugMinOrder": 3,
+  "notFiringGain": 0.25,
+  "audibleFromRpm": 150,
+  "turboGain": 0,
+  "turboCutoffHz": 1800,
+  "starterGain": 0.25,
+  "starterFrequencyHz": 140,
+  "parameterSmoothingS": 0.02,
+  "belowSpeakerGain": 0.2,
+  "lowCutCompensation": 0.6,
+  "exhaustRaspGain": 0.09,
+  "exhaustRaspCutoffHz": 3000,
+  "squealGain": 0.25,
+  "squealHz": 1100,
+  "squealFullSlipMps": 3
+}

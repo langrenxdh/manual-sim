@@ -3,7 +3,10 @@ using Sim.Core;
 
 namespace Sim.App;
 
-/// <summary>Engine sound synthesis settings, loaded from <c>config/engine-sound.json</c>.</summary>
+/// <summary>
+/// Engine sound synthesis settings for one car, loaded from the sound file <c>cars.json</c> names for it
+/// (<c>config/engine-sound.json</c> for the Golf).
+/// </summary>
 public sealed record SoundParams
 {
     public required double MasterGain { get; init; }
@@ -34,6 +37,13 @@ public sealed record SoundParams
     public required double BelowSpeakerGain { get; init; }
     /// <summary>Fraction of the removed gain added to the next two harmonics above the limit.</summary>
     public required double LowCutCompensation { get; init; }
+    /// <summary>Exhaust rasp: noise pulsed by each firing, growing with load (M12).</summary>
+    public required double ExhaustRaspGain { get; init; }
+    public required double ExhaustRaspCutoffHz { get; init; }
+    /// <summary>Tyre squeal while the driven tyres slide (M12), at full strength from <see cref="SquealFullSlipMps"/> of slip.</summary>
+    public required double SquealGain { get; init; }
+    public required double SquealHz { get; init; }
+    public required double SquealFullSlipMps { get; init; }
 
     public static SoundParams FromJson(string json)
     {
@@ -58,6 +68,8 @@ public sealed record SoundParams
         Require(ParameterSmoothingS > 0, "parameterSmoothingS must be > 0");
         Require(BelowSpeakerGain is >= 0 and <= 1, "belowSpeakerGain must be in [0, 1]");
         Require(LowCutCompensation >= 0, "lowCutCompensation must be >= 0");
+        Require(ExhaustRaspGain >= 0 && ExhaustRaspCutoffHz > 0, "exhaust rasp gain must be >= 0 and cutoff > 0");
+        Require(SquealGain >= 0 && SquealHz > 0 && SquealFullSlipMps > 0, "squeal gain must be >= 0, frequency and full slip > 0");
     }
 
     private static void Require(bool condition, string message)

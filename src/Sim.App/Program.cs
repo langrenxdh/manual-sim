@@ -29,7 +29,8 @@ var config = ConfigFiles.Locate();
 string carFile = ConfigFiles.VehicleFile; // the car menu (V) changes it
 var vehicle = VehicleParams.FromJson(config.Read(carFile));
 var input = InputConfig.FromJson(config.Read(ConfigFiles.InputFile));
-var sound = SoundParams.FromJson(config.Read(ConfigFiles.SoundFile));
+string soundFile = ConfigFiles.SoundFile; // each car has its own engine sound (M12)
+var sound = SoundParams.FromJson(config.Read(soundFile));
 var scene = Scene.FromJson(config.Read(ConfigFiles.SceneFile));
 var camera = CameraParams.FromJson(config.Read(ConfigFiles.CameraFile));
 var ffbParams = FfbParams.FromJson(config.Read(ConfigFiles.FfbFile));
@@ -198,12 +199,20 @@ TunableDocument VehicleDocument(string file) =>
 var carMenu = new CarMenu(config);
 TuningPanel? panelRef = null;
 
-void SelectCar(string file)
+TunableDocument SoundDocument(string file) =>
+    new("Sound", file, typeof(SoundParams), config.Read(file), SoundParams.FromJson,
+        o => { sound = (SoundParams)o; if (engineSound != null) engineSound.Params = sound; });
+
+void SelectCar(CarMenu.Car car)
 {
-    carFile = file;
-    vehicle = VehicleParams.FromJson(config.Read(file));
+    carFile = car.File;
+    vehicle = VehicleParams.FromJson(config.Read(car.File));
     physics.SubmitParams(vehicle);
-    panelRef?.Replace(VehicleDocument(file));
+    panelRef?.Replace(VehicleDocument(car.File));
+    soundFile = car.Sound;
+    sound = SoundParams.FromJson(config.Read(soundFile));
+    if (engineSound != null) engineSound.Params = sound;
+    panelRef?.Replace(SoundDocument(soundFile));
     if (activeExercise != null) StartExercise(activeExercise);
     else Restart(onHill);
 }
@@ -218,9 +227,7 @@ var panel = new TuningPanel(
             physics.SubmitInputConfig((InputConfig)o);
             ffb.SteeringAxisInverted = ((InputConfig)o).Steering.Inverted;
         }),
-    new TunableDocument("Sound", ConfigFiles.SoundFile, typeof(SoundParams),
-        config.Read(ConfigFiles.SoundFile), SoundParams.FromJson,
-        o => { sound = (SoundParams)o; if (engineSound != null) engineSound.Params = sound; }),
+    SoundDocument(soundFile),
     new TunableDocument("Scene (changing it restarts the car)", ConfigFiles.SceneFile, typeof(Scene),
         config.Read(ConfigFiles.SceneFile), Scene.FromJson,
         o => { scene = (Scene)o; if (sceneView != null) sceneView.Scene = scene; Restart(onHill); }),

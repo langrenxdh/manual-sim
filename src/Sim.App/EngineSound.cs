@@ -9,7 +9,8 @@ namespace Sim.App;
 /// Real-time engine sound (docs/design.md, 反馈通道 / 声音). Runs in raylib's audio callback, reads
 /// the newest physics frame from its own <see cref="LatestValue{T}"/> and never blocks the physics.
 /// Harmonics of the firing frequency carry the tone; lugging adds irregular per-firing amplitude
-/// modulation; boost adds filtered noise; the starter adds a buzz.
+/// modulation; boost adds filtered noise; the exhaust adds firing-pulsed noise under load; sliding tyres
+/// squeal; the starter adds a buzz.
 /// </summary>
 public sealed unsafe class EngineSound : IDisposable
 {
@@ -34,6 +35,7 @@ public sealed unsafe class EngineSound : IDisposable
     private double _phase, _starterPhase, _rpm;
     private double _loudness, _turbo, _starter, _shudder, _load;
     private double _lugRandom, _noiseLowPass;
+    private double _rasp, _raspLowPass, _squeal, _squealLow, _squealBand, _squealPhase, _squealWobble;
     private uint _rng = 0x9E3779B9;
     private double[] _harmonicScale = [];
     private double _testPhase, _testLevel, _lastTestHz;
@@ -127,6 +129,12 @@ public sealed unsafe class EngineSound : IDisposable
         double shudderTarget = Math.Clamp(s.ShudderIntensity, 0, 1);
         double smooth = 1 - Math.Exp(-1 / (SampleRate * p.ParameterSmoothingS));
         double noiseAlpha = 1 - Math.Exp(-2 * Math.PI * p.TurboCutoffHz / SampleRate);
+        double raspAlpha = 1 - Math.Exp(-2 * Math.PI * p.ExhaustRaspCutoffHz / SampleRate);
+        double raspTarget = p.ExhaustRaspGain * (s.Firing ? 1 : 0) * audible;
+        double slipMps = Math.Abs(s.DrivenWheelSpeedMps - s.SpeedMps);
+        double squealTarget = s.WheelSlip ? p.SquealGain * Math.Clamp(slipMps / p.SquealFullSlipMps, 0.3, 1) : 0;
+        double squealAlpha = 1 - Math.Exp(-2 * Math.PI * p.SquealHz * 1.5 / SampleRate);
+        double squealHighAlpha = 1 - Math.Exp(-2 * Math.PI * p.SquealHz * 0.6 / SampleRate);
 
         var harmonics = p.Harmonics;
         double gainSum = 0;
@@ -149,6 +157,8 @@ public sealed unsafe class EngineSound : IDisposable
             _starter += (starterTarget - _starter) * smooth;
             _shudder += (shudderTarget - _shudder) * smooth;
             _load += (loadTarget - _load) * smooth;
+            _rasp += (raspTarget - _rasp) * smooth;
+            _squeal += (squealTarget - _squeal) * smooth;
 
             // Lugging: each firing pulses the upper harmonics by a random amount.
             double withinFiring = _phase - Math.Floor(_phase);
@@ -171,7 +181,25 @@ public sealed unsafe class EngineSound : IDisposable
             _starterPhase -= Math.Floor(_starterPhase);
             double starter = Math.Sin(2 * Math.PI * _starterPhase) + StarterThirdHarmonic * Math.Sin(6 * Math.PI * _starterPhase);
 
-            double sample = p.MasterGain * (_loudness * tone * norm + _turbo * _noiseLowPass + _starter * starter);
+            // Exhaust: low-passed noise, pulsed by each firing and growing with load.
+            _raspLowPass += (NextSigned() - _raspLowPass) * raspAlpha;
+            double pulse = 0.5 + 0.5 * Math.Cos(2 * Math.PI * withinFiring);
+            double rasp = _rasp * (0.3 + 0.7 * _load) * pulse * pulse * _raspLowPass;
+
+            // Tyre squeal: a wavering tone around squealHz inside band-passed noise.
+            double squeal = 0;
+            if (_squeal > 1e-5)
+            {
+                _squealWobble += (NextSigned() - _squealWobble) * 0.0005;
+                _squealPhase += p.SquealHz * (1 + 0.08 * _squealWobble) / SampleRate;
+                _squealPhase -= Math.Floor(_squealPhase);
+                double n = NextSigned();
+                _squealLow += (n - _squealLow) * squealAlpha;
+                _squealBand += (_squealLow - _squealBand) * squealHighAlpha;
+                squeal = _squeal * (0.6 * Math.Sin(2 * Math.PI * _squealPhase) + 0.8 * (_squealLow - _squealBand));
+            }
+
+            double sample = p.MasterGain * (_loudness * tone * norm + _turbo * _noiseLowPass + _starter * starter + rasp) + squeal;
             output[i] = (float)Math.Tanh(sample);
         }
         _rpm = rpmEnd;

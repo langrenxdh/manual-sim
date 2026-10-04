@@ -1,0 +1,26 @@
+// Engine sound for the Civic Type R's 2.0 turbo four (M12): a bright, high-revving four with a hiss of boost
+// and a sharp exhaust. Fields as in engine-sound.json.
+{
+  "masterGain": 0.7,
+  "harmonics": [[1, 0.12], [2, 1.0], [3, 0.6], [4, 0.55], [5, 0.35], [6, 0.3], [8, 0.15], [10, 0.08]],
+  "loadReferenceNm": 420,
+  "idleLoudness": 0.45,
+  "loadLoudness": 0.55,
+  "loadBrightness": 1.0,
+  "lugModulationDepth": 0.7,
+  "lugMinOrder": 3,
+  "notFiringGain": 0.25,
+  "audibleFromRpm": 150,
+  "turboGain": 0.18,
+  "turboCutoffHz": 2200,
+  "starterGain": 0.25,
+  "starterFrequencyHz": 140,
+  "parameterSmoothingS": 0.02,
+  "belowSpeakerGain": 0.2,
+  "lowCutCompensation": 0.6,
+  "exhaustRaspGain": 0.1,
+  "exhaustRaspCutoffHz": 2600,
+  "squealGain": 0.25,
+  "squealHz": 1100,
+  "squealFullSlipMps": 3
+}

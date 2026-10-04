@@ -20,7 +20,10 @@ public sealed class CarMenu
     private static readonly Color Highlight = new(60, 90, 140, 255);
     private static readonly Color Good = new(90, 210, 110, 255);
 
-    private readonly List<(string File, string Name)> _cars = [];
+    /// <summary>A car: its vehicle file (physics), its engine sound file and its display name.</summary>
+    public sealed record Car(string File, string Sound, string Name);
+
+    private readonly List<Car> _cars = [];
     private int _selected;
     private UiButtons _previous;
 
@@ -33,18 +36,23 @@ public sealed class CarMenu
         {
             var options = new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true };
             using var list = JsonDocument.Parse(config.Read(ConfigFiles.CarsFile), options);
-            foreach (var file in list.RootElement.GetProperty("cars").EnumerateArray().Select(e => e.GetString()!))
-                _cars.Add((file, VehicleParams.FromJson(config.Read(file)).Name));
+            foreach (var e in list.RootElement.GetProperty("cars").EnumerateArray())
+            {
+                // An entry is { "vehicle", "sound" } (M12); a bare file name uses the default sound.
+                string file = e.ValueKind == JsonValueKind.String ? e.GetString()! : e.GetProperty("vehicle").GetString()!;
+                string sound = e.ValueKind == JsonValueKind.Object && e.TryGetProperty("sound", out var s) ? s.GetString()! : ConfigFiles.SoundFile;
+                _cars.Add(new Car(file, sound, VehicleParams.FromJson(config.Read(file)).Name));
+            }
         }
         catch (Exception ex) when (ex is IOException or JsonException or ArgumentException or KeyNotFoundException)
         {
             Error = $"cars: {ex.Message}";
         }
-        if (_cars.Count == 0) _cars.Add((ConfigFiles.VehicleFile, "default"));
+        if (_cars.Count == 0) _cars.Add(new Car(ConfigFiles.VehicleFile, ConfigFiles.SoundFile, "default"));
     }
 
-    /// <summary>Menu input; returns the chosen car's file name, or null.</summary>
-    public string? Update(UiButtons buttons)
+    /// <summary>Menu input; returns the chosen car, or null.</summary>
+    public Car? Update(UiButtons buttons)
     {
         bool up = IsKeyPressed(KeyboardKey.Up) || (buttons.PadUp && !_previous.PadUp);
         bool down = IsKeyPressed(KeyboardKey.Down) || (buttons.PadDown && !_previous.PadDown);
@@ -55,7 +63,7 @@ public sealed class CarMenu
         if (down) _selected = (_selected + 1) % _cars.Count;
         if (!choose) return null;
         Open = false;
-        return _cars[_selected].File;
+        return _cars[_selected];
     }
 
     public void Draw(string currentFile, Rectangle area)

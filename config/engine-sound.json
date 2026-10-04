@@ -4,6 +4,8 @@
 // what PC speakers play, so energy sits in orders 2-8 and the ear fills in the missing fundamental.
 // Harmonics below the speaker limit measured in first-time setup are turned down to belowSpeakerGain,
 // and lowCutCompensation of the removed gain is added to the next two harmonics above the limit.
+// exhaustRasp: noise pulsed by each firing, growing with load. squeal: tyre squeal while the driven tyres
+// slide, full from squealFullSlipMps of slip (M12). Each car in cars.json names its own sound file.
 {
   "masterGain": 0.7,
   "harmonics": [[1, 0.15], [2, 1.0], [3, 0.55], [4, 0.45], [5, 0.25], [6, 0.2], [7, 0.12], [8, 0.08]],
@@ -21,5 +23,10 @@
   "starterFrequencyHz": 140,
   "parameterSmoothingS": 0.02,
   "belowSpeakerGain": 0.2,
-  "lowCutCompensation": 0.6
+  "lowCutCompensation": 0.6,
+  "exhaustRaspGain": 0.06,
+  "exhaustRaspCutoffHz": 2000,
+  "squealGain": 0.25,
+  "squealHz": 1100,
+  "squealFullSlipMps": 3
 }

@@ -1,0 +1,26 @@
+// Engine sound for the 2.0 turbo diesel (M12): heavy low orders, a hard combustion clatter (wide rasp)
+// and a turbo whistle. Fields as in engine-sound.json.
+{
+  "masterGain": 0.7,
+  "harmonics": [[1, 0.3], [2, 1.0], [3, 0.7], [4, 0.4], [5, 0.2], [6, 0.12]],
+  "loadReferenceNm": 350,
+  "idleLoudness": 0.45,
+  "loadLoudness": 0.55,
+  "loadBrightness": 0.8,
+  "lugModulationDepth": 0.8,
+  "lugMinOrder": 3,
+  "notFiringGain": 0.25,
+  "audibleFromRpm": 150,
+  "turboGain": 0.16,
+  "turboCutoffHz": 2400,
+  "starterGain": 0.25,
+  "starterFrequencyHz": 140,
+  "parameterSmoothingS": 0.02,
+  "belowSpeakerGain": 0.2,
+  "lowCutCompensation": 0.6,
+  "exhaustRaspGain": 0.14,
+  "exhaustRaspCutoffHz": 4000,
+  "squealGain": 0.25,
+  "squealHz": 1100,
+  "squealFullSlipMps": 3
+}
