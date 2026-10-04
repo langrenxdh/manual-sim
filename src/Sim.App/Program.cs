@@ -434,13 +434,13 @@ while (!WindowShouldClose())
         eye = sceneView.Draw(frame.State, viewRect, frame.Exercise.Live.LeadPositionM, frame.Exercise.Live.LeadBraking, Cockpit);
         world = sceneView;
     }
-    if (!replayOpen && !progressOpen && !leaderboard.Open)
+    if (!replayOpen && !progressOpen && !leaderboard.Open && !driverPicker.Open)
     {
         driverAids.DrawMirrors(world, eye, frame.State, camera, carOutline, viewRect);
         if (frame.State.Steering) driverAids.DrawOverhead(world, frame.State, camera, carOutline, viewRect);
     }
     parkPilot.Update(parking, town, carOutline, frame.State, GetFrameTime());
-    if (!replayOpen && !progressOpen && !leaderboard.Open) parkPilot.Draw(parking, viewRect);
+    if (!replayOpen && !progressOpen && !leaderboard.Open && !driverPicker.Open) parkPilot.Draw(parking, viewRect);
     var roadArea = new Rectangle(viewArea.X, viewArea.Y, viewArea.Width, roadHeight);
     if (teaching && !replayOpen) TeachingOverlay.Draw(frame, vehicle, roadArea);
     if (progressOpen)
