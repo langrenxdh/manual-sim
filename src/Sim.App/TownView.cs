@@ -7,8 +7,8 @@ using static Raylib_cs.Raylib;
 namespace Sim.App;
 
 /// <summary>
-/// The driver's view on the flat town map (M9c): roads, the roundabout, the car park with its bays and
-/// buildings off the road, seen from the car's world pose. Map X east / Y north become raylib X / -Z
+/// The driver's view on the flat town map (M9c): roads, roundabouts, car parks with their bays and parked
+/// cars, and buildings off the road, seen from the car's world pose. Map X east / Y north become raylib X / -Z
 /// (Y is up). The geometry is built once per map; body pitch and judder shake come from
 /// <see cref="SceneView"/>'s camera settings. Presentation only.
 /// </summary>
@@ -18,7 +18,9 @@ public sealed class TownView : IDisposable
     private const float DashLength = 3, DashPeriod = 12;
     private const float GroundHalfSize = 2000;
     private const int RingSegments = 72;
-    private const double BlockCellM = 30, BlockClearanceM = 6;
+    private const double BlockCellM = 30, BlockClearanceM = 6, BlockMarginM = 150;
+    private const double TwoLaneRingWidthM = 10;
+    private const float ParkedBodyHeight = 0.8f, ParkedCabinHeight = 0.5f;
     private const double CentreLineMinWidthM = 6.5;
 
     private static readonly Color Sky = new(150, 185, 215, 255);
@@ -27,6 +29,11 @@ public sealed class TownView : IDisposable
     private static readonly Color Marking = new(235, 235, 235, 255);
     private static readonly Color Kerb = new(190, 190, 185, 255);
     private static readonly Color Goal = new(245, 200, 40, 255);
+    private static readonly Color CarGlass = new(40, 50, 60, 255);
+    private static readonly Color[] CarColours =
+    [
+        new(170, 30, 30, 255), new(220, 220, 225, 255), new(30, 60, 140, 255), new(25, 25, 28, 255), new(150, 150, 155, 255),
+    ];
     private static readonly Color[] BlockColours =
     [
         new(120, 110, 100, 255), new(140, 130, 115, 255), new(95, 105, 115, 255), new(60, 95, 60, 255),
@@ -55,16 +62,29 @@ public sealed class TownView : IDisposable
         Quad(At(-GroundHalfSize, -GroundHalfSize, -0.02f), At(GroundHalfSize, -GroundHalfSize, -0.02f),
             At(GroundHalfSize, GroundHalfSize, -0.02f), At(-GroundHalfSize, GroundHalfSize, -0.02f), Grass);
 
-        var cp = map.CarPark;
-        double x0 = cp.Corner[0], y0 = cp.Corner[1], x1 = x0 + cp.Size[0], y1 = y0 + cp.Size[1];
-        Quad(At(x0, y0), At(x1, y0), At(x1, y1), At(x0, y1), Asphalt);
-        foreach (var (minX, minY, maxX, _) in map.Bays())
+        for (int k = 0; k < map.CarParks.Length; k++)
         {
-            foreach (double bx in new[] { minX, maxX })
-                Quad(At(bx - LineWidth / 2, minY, MarkingLift), At(bx + LineWidth / 2, minY, MarkingLift),
-                    At(bx + LineWidth / 2, y1, MarkingLift), At(bx - LineWidth / 2, y1, MarkingLift), Marking);
-            Quad(At(minX, minY, MarkingLift), At(maxX, minY, MarkingLift),
-                At(maxX, minY + LineWidth, MarkingLift), At(minX, minY + LineWidth, MarkingLift), Marking);
+            var cp = map.CarParks[k];
+            double x0 = cp.Corner[0], y0 = cp.Corner[1], x1 = x0 + cp.Size[0], y1 = y0 + cp.Size[1];
+            Quad(At(x0, y0), At(x1, y0), At(x1, y1), At(x0, y1), Asphalt);
+            foreach (var (minX, minY, maxX, _) in map.Bays(k))
+            {
+                foreach (double bx in new[] { minX, maxX })
+                    Quad(At(bx - LineWidth / 2, minY, MarkingLift), At(bx + LineWidth / 2, minY, MarkingLift),
+                        At(bx + LineWidth / 2, y1, MarkingLift), At(bx - LineWidth / 2, y1, MarkingLift), Marking);
+                Quad(At(minX, minY, MarkingLift), At(maxX, minY, MarkingLift),
+                    At(maxX, minY + LineWidth, MarkingLift), At(minX, minY + LineWidth, MarkingLift), Marking);
+            }
+        }
+        // Parked cars: a body and a lower glasshouse, so their size reads at a glance.
+        int carIndex = 0;
+        foreach (var (minX, minY, maxX, maxY) in map.ParkedCars())
+        {
+            double cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+            float w = (float)(maxX - minX), l = (float)(maxY - minY);
+            var colour = CarColours[carIndex++ % CarColours.Length];
+            _blocks.Add((At(cx, cy, ParkedBodyHeight / 2 + 0.2f), new Vector3(w, ParkedBodyHeight, l), colour));
+            _blocks.Add((At(cx, cy, ParkedBodyHeight + 0.2f + ParkedCabinHeight / 2), new Vector3(w * 0.85f, ParkedCabinHeight, l * 0.5f), CarGlass));
         }
 
         foreach (var (road, pts) in map.Expanded)
@@ -87,14 +107,34 @@ public sealed class TownView : IDisposable
             }
         }
 
-        var rb = map.Roundabout;
-        Ring(rb.Center[0], rb.Center[1], rb.IslandRadiusM, rb.OuterRadiusM, 0.005f, Asphalt);
-        Ring(rb.Center[0], rb.Center[1], rb.IslandRadiusM, rb.IslandRadiusM + 0.4, IslandLift / 2 + 0.01f, Kerb);
-        Ring(rb.Center[0], rb.Center[1], 0, rb.IslandRadiusM, IslandLift, Grass);
+        foreach (var rb in map.Roundabouts)
+        {
+            double cx = rb.Center[0], cy = rb.Center[1];
+            Ring(cx, cy, rb.IslandRadiusM, rb.OuterRadiusM, 0.005f, Asphalt);
+            Ring(cx, cy, rb.IslandRadiusM, rb.IslandRadiusM + 0.4, IslandLift / 2 + 0.01f, Kerb);
+            Ring(cx, cy, 0, rb.IslandRadiusM, IslandLift, Grass);
+            // A wide ring has two lanes: a dashed line between them.
+            if (rb.OuterRadiusM - rb.IslandRadiusM >= TwoLaneRingWidthM)
+            {
+                double mid = (rb.IslandRadiusM + rb.OuterRadiusM) / 2;
+                int dashes = (int)(2 * Math.PI * mid / DashPeriod);
+                for (int i = 0; i < dashes; i++)
+                {
+                    double a = 2 * Math.PI * i / dashes, b = a + DashLength / mid;
+                    Quad(At(cx + Math.Cos(a) * (mid - LineWidth / 2), cy + Math.Sin(a) * (mid - LineWidth / 2), MarkingLift),
+                        At(cx + Math.Cos(a) * (mid + LineWidth / 2), cy + Math.Sin(a) * (mid + LineWidth / 2), MarkingLift),
+                        At(cx + Math.Cos(b) * (mid + LineWidth / 2), cy + Math.Sin(b) * (mid + LineWidth / 2), MarkingLift),
+                        At(cx + Math.Cos(b) * (mid - LineWidth / 2), cy + Math.Sin(b) * (mid - LineWidth / 2), MarkingLift), Marking);
+                }
+            }
+        }
 
-        // Buildings and tree lines on a fixed grid, kept clear of every road, so turning shows motion.
-        for (int gx = -10; gx < 30; gx++)
-            for (int gy = -10; gy < 20; gy++)
+        // Buildings and tree lines on a fixed grid over the whole map, kept clear of every road, so turning shows motion.
+        var all = map.Expanded.SelectMany(r => r.Points).ToList();
+        int gx0 = (int)Math.Floor((all.Min(p => p.X) - BlockMarginM) / BlockCellM), gx1 = (int)Math.Ceiling((all.Max(p => p.X) + BlockMarginM) / BlockCellM);
+        int gy0 = (int)Math.Floor((all.Min(p => p.Y) - BlockMarginM) / BlockCellM), gy1 = (int)Math.Ceiling((all.Max(p => p.Y) + BlockMarginM) / BlockCellM);
+        for (int gx = gx0; gx < gx1; gx++)
+            for (int gy = gy0; gy < gy1; gy++)
             {
                 uint h = Hash((uint)(gx * 7919 + gy * 104729));
                 if (h % 3 == 0) continue;

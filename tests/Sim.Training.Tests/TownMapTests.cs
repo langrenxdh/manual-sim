@@ -41,7 +41,60 @@ public class TownMapTests
 
         Assert.Equal(cp.BayCount, bays.Count);
         Assert.All(bays, b => Assert.Equal(cp.Corner[1] + cp.Size[1], b.MaxY, 9));
-        Assert.All(bays, b => Assert.True(Town.OnRoad((b.MinX + b.MaxX) / 2, (b.MinY + b.MaxY) / 2)));
+        Assert.All(bays, b => Assert.True(b.MinX >= cp.Corner[0] && b.MaxX <= cp.Corner[0] + cp.Size[0] && b.MinY >= cp.Corner[1]));
+        // Every bay without a parked car is road (a parked car is an obstacle).
+        Assert.All(bays.Where((_, i) => !cp.ParkedBays.Contains(i)),
+            b => Assert.True(Town.OnRoad((b.MinX + b.MaxX) / 2, (b.MinY + b.MaxY) / 2)));
+    }
+
+    /// <summary>
+    /// Every road end joins another road, a roundabout or a car park (a point a few metres past it is still
+    /// road), except the dead end, so free driving can go round the town without leaving the road.
+    /// </summary>
+    [Fact]
+    public void EveryRoadEnd_JoinsTheNetwork_ExceptTheDeadEnd()
+    {
+        foreach (var (road, pts) in Town.Expanded.Where(r => r.Road.Name != "deadEnd"))
+        {
+            foreach (var (end, inner) in new[] { (pts[^1], pts[^2]), (pts[0], pts[1]) })
+            {
+                double dx = end.X - inner.X, dy = end.Y - inner.Y, len = Math.Sqrt(dx * dx + dy * dy);
+                double px = end.X + dx / len * 2, py = end.Y + dy / len * 2;
+                Assert.True(Town.OnRoad(px, py), $"{road.Name} ends at ({end.X:F0}, {end.Y:F0}) without joining anything");
+            }
+        }
+    }
+
+    [Fact]
+    public void Town_IsAtLeastAKilometreAcross_WithTwoRoundaboutsAndCarParks()
+    {
+        var pts = Town.Expanded.SelectMany(r => r.Points).ToList();
+        Assert.True(pts.Max(p => p.X) - pts.Min(p => p.X) >= 1000);
+        Assert.True(Town.Roundabouts.Length >= 2 && Town.CarParks.Length >= 2);
+        Assert.Contains(Town.Expanded, r => r.Points.Count > 1000); // a long road for the higher gears
+    }
+
+    [Fact]
+    public void ParkedCars_SitInsideTheirBays_AndAreNotRoad()
+    {
+        var parked = Town.ParkedCars();
+        Assert.NotEmpty(parked);
+        var bays = Enumerable.Range(0, Town.CarParks.Length).SelectMany(k => Town.Bays(k)).ToList();
+        foreach (var (minX, minY, maxX, maxY) in parked)
+        {
+            Assert.Contains(bays, b => minX >= b.MinX && maxX <= b.MaxX && minY >= b.MinY && maxY <= b.MaxY);
+            Assert.False(Town.OnRoad((minX + maxX) / 2, (minY + maxY) / 2));
+            Assert.True(Town.OnRoad((minX + maxX) / 2, minY - 0.3)); // the aisle in front of it is road
+        }
+    }
+
+    [Fact]
+    public void ExerciseBay_AndItsNeighbours_AreFree()
+    {
+        var parked = Town.ParkedCars();
+        foreach (var (minX, minY, maxX, maxY) in Town.Bays().Take(3))
+            Assert.True(Town.OnRoad((minX + maxX) / 2, (minY + maxY) / 2));
+        Assert.Contains(Town.CarPark.ParkedBays, b => b > 2);
     }
 
     [Fact]

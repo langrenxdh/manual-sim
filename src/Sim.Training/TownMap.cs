@@ -4,22 +4,30 @@ namespace Sim.Training;
 
 /// <summary>
 /// The flat town map for driving with steering (M9c), loaded from <c>config/town.json</c>: roads built
-/// from straights and arcs, a roundabout, a car park with bays, and named start poses. Positions are
+/// from straights and arcs, roundabouts, car parks with bays (some taken by parked cars), and named start poses. Positions are
 /// metres on the ground plane, X east and Y north; headings in degrees counter-clockwise from east.
 /// The physics only needs a flat road; this map decides where "the road" is (for judging and drawing).
 /// </summary>
 public sealed record TownMap
 {
     public required TownRoad[] Roads { get; init; }
-    public required RoundaboutDef Roundabout { get; init; }
-    public required CarParkDef CarPark { get; init; }
+    public required RoundaboutDef[] Roundabouts { get; init; }
+    public required CarParkDef[] CarParks { get; init; }
     public required TownStart[] Starts { get; init; }
+
+    /// <summary>The first roundabout (the one the exercises use).</summary>
+    public RoundaboutDef Roundabout => Roundabouts[0];
+    /// <summary>The first car park (the one the exercises use).</summary>
+    public CarParkDef CarPark => CarParks[0];
 
     /// <summary>Spacing of the expanded road centre-line points.</summary>
     public const double PointSpacingM = 1.0;
+    /// <summary>Cell size of the lookup grid that finds the road segments near a point.</summary>
+    private const double CellM = 20;
 
     private IReadOnlyList<(TownRoad Road, IReadOnlyList<(double X, double Y)> Points)>? _expanded;
-    private (double MinX, double MinY, double MaxX, double MaxY)[]? _bounds;
+    private Dictionary<(int, int), List<(int Road, int Segment)>>? _cells;
+    private (double MinX, double MinY, double MaxX, double MaxY)[]? _parked;
 
     public static TownMap FromJson(string json)
     {
@@ -40,13 +48,19 @@ public sealed record TownMap
                 ExerciseConfig.Require(p.StraightM > 0 ^ (p.TurnDeg != 0 && p.RadiusM > 0),
                     $"town road \"{r.Name}\": each piece is a straight (straightM) or an arc (turnDeg, radiusM)");
         }
-        var rb = Roundabout;
-        ExerciseConfig.Require(rb.Center.Length == 2 && rb.IslandRadiusM > 0 && rb.OuterRadiusM > rb.IslandRadiusM,
-            "town roundabout: center [x, y] and 0 < islandRadiusM < outerRadiusM");
-        var cp = CarPark;
-        ExerciseConfig.Require(cp.Corner.Length == 2 && cp.Size.Length == 2 && cp.Size.All(s => s > 0), "town car park: corner and size");
-        ExerciseConfig.Require(cp.BayCount > 0 && cp.BayWidthM > 0 && cp.BayDepthM > 0 && cp.BayCount * cp.BayWidthM <= cp.Size[0],
-            "town car park: bays must fit along its width");
+        ExerciseConfig.Require(Roundabouts.Length > 0 && CarParks.Length > 0, "town: at least one roundabout and one car park");
+        foreach (var rb in Roundabouts)
+            ExerciseConfig.Require(rb.Center.Length == 2 && rb.IslandRadiusM > 0 && rb.OuterRadiusM > rb.IslandRadiusM,
+                "town roundabout: center [x, y] and 0 < islandRadiusM < outerRadiusM");
+        foreach (var cp in CarParks)
+        {
+            ExerciseConfig.Require(cp.Corner.Length == 2 && cp.Size.Length == 2 && cp.Size.All(s => s > 0), "town car park: corner and size");
+            ExerciseConfig.Require(cp.BayCount > 0 && cp.BayWidthM > 0 && cp.BayDepthM > 0 && cp.BayCount * cp.BayWidthM <= cp.Size[0],
+                "town car park: bays must fit along its width");
+            ExerciseConfig.Require(cp.ParkedBays.All(b => b >= 0 && b < cp.BayCount), "town car park: parkedBays must be bay indices");
+            ExerciseConfig.Require(cp.ParkedCarSize.Length == 2 && cp.ParkedCarSize[0] > 0 && cp.ParkedCarSize[0] <= cp.BayWidthM
+                && cp.ParkedCarSize[1] > 0 && cp.ParkedCarSize[1] <= cp.BayDepthM, "town car park: parkedCarSize [width, length] must fit a bay");
+        }
         ExerciseConfig.Require(Starts.Length > 0 && Starts.Select(s => s.Id).Distinct().Count() == Starts.Length, "town: unique start ids");
     }
 
@@ -89,38 +103,85 @@ public sealed record TownMap
         return pts;
     }
 
-    /// <summary>True on a road, on the roundabout's carriageway or in the car park.</summary>
+    /// <summary>True on a road, on a roundabout's carriageway or in a car park, and not in a parked car.</summary>
     public bool OnRoad(double x, double y)
     {
-        var rb = Roundabout;
-        double dr = Math.Sqrt(Sq(x - rb.Center[0]) + Sq(y - rb.Center[1]));
-        if (dr <= rb.IslandRadiusM) return false;                 // the island is never road
-        if (dr <= rb.OuterRadiusM) return true;
-        var cp = CarPark;
-        if (x >= cp.Corner[0] && x <= cp.Corner[0] + cp.Size[0] && y >= cp.Corner[1] && y <= cp.Corner[1] + cp.Size[1]) return true;
-        // Each road's bounding box first: town exercises ask for every car corner at every physics step.
-        _bounds ??= Expanded.Select(r => (r.Points.Min(p => p.X) - r.Road.WidthM, r.Points.Min(p => p.Y) - r.Road.WidthM,
-            r.Points.Max(p => p.X) + r.Road.WidthM, r.Points.Max(p => p.Y) + r.Road.WidthM)).ToArray();
-        for (int k = 0; k < Expanded.Count; k++)
+        foreach (var p in ParkedCars())
+            if (x >= p.MinX && x <= p.MaxX && y >= p.MinY && y <= p.MaxY) return false;
+        foreach (var rb in Roundabouts)
         {
-            var (road, pts) = Expanded[k];
-            var b = _bounds[k];
-            if (x < b.MinX || x > b.MaxX || y < b.MinY || y > b.MaxY) continue;
-            double half = road.WidthM / 2;
-            for (int i = 1; i < pts.Count; i++)
-                if (DistanceToSegment(x, y, pts[i - 1], pts[i]) <= half) return true;
+            double dr = Math.Sqrt(Sq(x - rb.Center[0]) + Sq(y - rb.Center[1]));
+            if (dr <= rb.IslandRadiusM) return false;             // the island is never road
+            if (dr <= rb.OuterRadiusM) return true;
+        }
+        foreach (var cp in CarParks)
+            if (x >= cp.Corner[0] && x <= cp.Corner[0] + cp.Size[0] && y >= cp.Corner[1] && y <= cp.Corner[1] + cp.Size[1]) return true;
+        // Only the segments in this point's grid cell: town exercises ask for every car corner at every physics step.
+        if (!Cells.TryGetValue(Cell(x, y), out var near)) return false;
+        foreach (var (road, segment) in near)
+        {
+            var (r, pts) = Expanded[road];
+            if (DistanceToSegment(x, y, pts[segment - 1], pts[segment]) <= r.WidthM / 2) return true;
         }
         return false;
     }
 
-    /// <summary>The bays as rectangles (minX, minY, maxX, maxY) along the far (north) edge of the car park.</summary>
-    public IEnumerable<(double MinX, double MinY, double MaxX, double MaxY)> Bays()
+    /// <summary>Each road segment, listed in every grid cell its road surface reaches.</summary>
+    private Dictionary<(int, int), List<(int Road, int Segment)>> Cells => _cells ??= BuildCells();
+
+    private Dictionary<(int, int), List<(int Road, int Segment)>> BuildCells()
     {
-        var cp = CarPark;
+        var cells = new Dictionary<(int, int), List<(int, int)>>();
+        for (int k = 0; k < Expanded.Count; k++)
+        {
+            var (road, pts) = Expanded[k];
+            double half = road.WidthM / 2;
+            for (int i = 1; i < pts.Count; i++)
+            {
+                var (x0, y0) = Cell(Math.Min(pts[i - 1].X, pts[i].X) - half, Math.Min(pts[i - 1].Y, pts[i].Y) - half);
+                var (x1, y1) = Cell(Math.Max(pts[i - 1].X, pts[i].X) + half, Math.Max(pts[i - 1].Y, pts[i].Y) + half);
+                for (int cx = x0; cx <= x1; cx++)
+                    for (int cy = y0; cy <= y1; cy++)
+                    {
+                        if (!cells.TryGetValue((cx, cy), out var list)) cells[(cx, cy)] = list = [];
+                        list.Add((k, i));
+                    }
+            }
+        }
+        return cells;
+    }
+
+    private static (int, int) Cell(double x, double y) => ((int)Math.Floor(x / CellM), (int)Math.Floor(y / CellM));
+
+    /// <summary>The bays of a car park as rectangles (minX, minY, maxX, maxY) along its far (north) edge.</summary>
+    public IEnumerable<(double MinX, double MinY, double MaxX, double MaxY)> Bays(int carPark = 0)
+    {
+        var cp = CarParks[carPark];
         double top = cp.Corner[1] + cp.Size[1];
         double start = cp.Corner[0] + (cp.Size[0] - cp.BayCount * cp.BayWidthM) / 2;
         for (int i = 0; i < cp.BayCount; i++)
             yield return (start + i * cp.BayWidthM, top - cp.BayDepthM, start + (i + 1) * cp.BayWidthM, top);
+    }
+
+    /// <summary>Every parked car as a rectangle (minX, minY, maxX, maxY), centred in its bay.</summary>
+    public IReadOnlyList<(double MinX, double MinY, double MaxX, double MaxY)> ParkedCars() => _parked ??= BuildParked();
+
+    private (double, double, double, double)[] BuildParked()
+    {
+        var cars = new List<(double, double, double, double)>();
+        for (int k = 0; k < CarParks.Length; k++)
+        {
+            var cp = CarParks[k];
+            var bays = Bays(k).ToList();
+            double w = cp.ParkedCarSize[0], l = cp.ParkedCarSize[1];
+            foreach (int b in cp.ParkedBays)
+            {
+                var (minX, minY, maxX, maxY) = bays[b];
+                double cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+                cars.Add((cx - w / 2, cy - l / 2, cx + w / 2, cy + l / 2));
+            }
+        }
+        return cars.ToArray();
     }
 
     private static double Sq(double v) => v * v;
@@ -166,6 +227,10 @@ public sealed record CarParkDef
     public required int BayCount { get; init; }
     public required double BayWidthM { get; init; }
     public required double BayDepthM { get; init; }
+    /// <summary>Bays taken by parked cars (obstacles: not road).</summary>
+    public int[] ParkedBays { get; init; } = [];
+    /// <summary>A parked car's [width, length].</summary>
+    public double[] ParkedCarSize { get; init; } = [1.8, 4.3];
 }
 
 public sealed record TownStart
