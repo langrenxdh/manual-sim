@@ -140,7 +140,7 @@ All three channels are driven by the same physical quantities: engine speed, loa
 
 **Sound.** Engine sound is synthesised in real time. A four-cylinder four-stroke fires twice per revolution: ~27 Hz fundamental at 800 rpm, 200 Hz at 6000 rpm. Ordinary speakers cannot play 27 Hz, so the energy goes mainly into harmonics 2–8 and the "missing fundamental" effect lets the ear fill in the bass. Labouring is conveyed by irregular amplitude modulation of the mid and high frequencies at the firing rhythm. Turbo airflow noise is added as boost builds. First-time setup calibrates the speakers' low-frequency limit with a sweep.
 
-**Force feedback.** The wheel carries the low-frequency part the body can feel: engine judder as a periodic sine effect whose frequency follows the firing frequency and whose amplitude follows judder intensity; gear grinding as a short high-frequency vibration; a jolt at the moment of stalling. Update rate ~100 Hz.
+**Force feedback.** The wheel carries the low-frequency part the body can feel: engine judder as a periodic sine effect whose frequency follows the firing frequency and whose amplitude follows judder intensity; gear grinding as a short high-frequency vibration; a fading shake when the car jerks (rough clutch engagement, a stall), stronger the harder the jerk. Update rate ~100 Hz.
 
 ## Immersion mode, teaching mode and replay
 
@@ -245,6 +245,7 @@ There is no real-car data, so the "ground truth" is my driving experience with t
 | T14 | 2nd at 20 km/h, wheel straight, 10 s (M9) | Heading and lateral position unchanged; the car moves on | A straight wheel goes straight |
 | T15 | 3rd at 50 km/h with the wheel at 20°, 45° and 200° left, and 45° right (M9) | Aligning torque opposes the turn, larger at 45° than at 20°, smaller when sliding (200°) than at 45° | The wheel pulls back to centre and goes light at the grip limit |
 | T16 | Steering off (the hill road), wheel turned 300° (M9) | The car follows the road: world X = road position, heading 0 | Steering never changes v1 behaviour |
+| T17 | Steering on, 1st at 7 km/h, wheel held at ±180° (M9 follow-up) | Aligning torque towards centre ≥ 0.3 Nm, equal and opposite left and right; 0 at a standstill | The wheel returns at parking and roundabout speeds; standing still it stays put |
 
 Every time I remember another "my car does this", add a row.
 
@@ -439,6 +440,20 @@ The milestones after M4 (M5–M10: coaching, more exercises, fidelity and other 
 | N8 | Town exercises: roundabout (clockwise via the west side, out of the east exit in 2nd or higher), car-park bay (2nd bay from the left, nose in within 10°, stopped), three-point turn (in the dead end, pointing south within 15°, moving in 1st). New metric `offRoadS`: time with any corner of the car's outline (`townCar` in `exercises.json`) off the road. `via` areas must be passed in order; the finish zone needs the whole car inside and is drawn in yellow | "Line keeping" is judged as time off the road; goals only judge, never act on the car |
 | N9 | Tests: T12–T16 for steering physics, town map geometry tests, and S11–S13 with pure-pursuit scripted drivers: roundabout 100, anticlockwise shortcut never finishes; bay 97, wrong bay never finishes; three-point turn 86 when careful, 51 over the kerbs | As before, the tests pin the intent; `exercises.json` is tuned by feel |
 | N10 | Not in M9: giving way to other traffic at the roundabout, collisions and kerb physics, camera lag on turning | Out of scope for now; leaving the road is only judged |
+
+## M9 follow-up decision record (town test drive)
+
+2026-10-04, after the owner's first G29 drive on the town map: the steering felt wrong and hard to hold in roundabouts, the map felt small, and there was no way to judge the car's size when parking. Also asked for: a felt jerk when the clutch engages roughly. Hand check pending.
+
+| # | Decision | Reason |
+| --- | --- | --- |
+| N11 | Geometric centring (caster and kingpin inclination) added to the aligning torque: front axle load × `centringLeverM` (0.012 m) × sin(road-wheel angle), fading to 0 below `centringFullSpeedMps` (1.5 m/s). T17 | The tyre torque alone grows with v², so at 10–20 km/h it was lost in the G29's own friction and the wheel never unwound. The lever is kept small enough that the wheel still goes light past the grip limit (T15) |
+| N12 | Jolts became a fading sine burst (`joltFrequencyHz` 8 Hz, fading over `joltLengthMs` 350 ms) that pushes neither way, fired at the jerk's peak and scaled linearly from `joltThresholdMps3` (30) to `joltFullScaleMps3` (400). Replaces F5's constant-force jolt | The constant force kicked the steering axis left or right on every shift, in the middle of a roundabout. Measured with the physics as it is: a rev-matched shift peaks at 15–20 m/s³, rough ones 65–430 m/s³, rising with rev mismatch and release speed, so the shake follows the engagement with no new physics (hard rule 2) |
+| N13 | Steering force: `steeringFullScaleNm` 3 → 2 Nm (nearer the G29's peak) and a smoothed friction term `steeringFrictionLevel` × tanh(rate / `steeringFrictionRateDegPerS`) | A rack and column have friction; without it the motor's force alone made the wheel feel loose. The force direction was never checked while driving: the hand check does it |
+| N14 | Larger town (about 1.2 × 0.7 km, about 6 km of road): every existing road and start unchanged, plus a west loop back to the start, a 1 km arterial road, a two-lane roundabout (island 18 m, outer edge 30 m), a north loop, cross streets and a second car park (40 bays). `town.json` takes arrays `roundabouts` and `carParks` (the first of each is the exercises'); `parkedBays` fill bays with cars that are not road, so touching one counts as off the road. The bays the bay exercise uses and both neighbours stay free | Room for 3rd–5th gear and for choosing routes; the exercises and S11–S13 are unchanged. `OnRoad` now uses a 20 m grid lookup so it stays cheap at 1 kHz |
+| N15 | The own car's body is drawn on the car frame: bonnet (windscreen base 1.0 m ahead of the eye at 0.95 m high, nose 0.85 m high at the outline's front), dashboard and A-pillars (`camera.json` `cockpit`; width and nose from `townCar`). `lookDownDeg` (5°) rests the eyes below the horizon | With the owner's true-to-scale view (60 cm screen at 70 cm, about 20° vertical) the view reached only 10° below the horizon: the bonnet and the first 7 m of road were off-screen. The look-down turns the eyes, not the car, so the body stays where it is on the car |
+| N16 | Interior and wing mirrors (F), each drawn from its own camera on the car and flipped left to right; the wing mirrors show the car's flank. A top-down inset on the town map (B, off by default) with the car's outline in yellow. The town is uploaded once as a GPU mesh so the extra views stay cheap | A driver judges position mostly from mirrors; the overhead view is an aid while learning, which you can turn off |
+| N17 | ParkPilot on the town map (`config/parking.json`): four sensors per bumper (corner ones turned 30° outwards) find the first point that is not road (parked car, kerb, car-park edge); front below 10 km/h or in reverse, rear in reverse; ranges 1.2 m front / 1.5 m rear. Beeps from every 0.6 s to every 0.12 s, continuous below 0.3 m, higher tone in front; a small distance display | Like the Golf's own Park Distance Control. Pure sensor logic in `Sim.Training` with tests; sounds and display in the app |
 
 ## M10 decision record (sharing)
 

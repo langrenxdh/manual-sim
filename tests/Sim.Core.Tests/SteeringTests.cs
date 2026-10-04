@@ -1,6 +1,6 @@
 namespace Sim.Core.Tests;
 
-/// <summary>Acceptance tests T12-T16 for steering (M9b, docs/design.en.md).</summary>
+/// <summary>Acceptance tests T12-T17 for steering (M9b and its follow-up, docs/design.en.md).</summary>
 public class SteeringTests
 {
     private static readonly VehicleParams Golf_ = Golf.Load();
