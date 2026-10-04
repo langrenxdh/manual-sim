@@ -24,6 +24,21 @@ public class GearboxTests
         Assert.True(sim.State.Grinding);
     }
 
+    /// <summary>M13: the grind's speed difference is the input shaft against the gear being forced in.</summary>
+    [Fact]
+    public void Grinding_ReportsTheSpeedDifferenceToTheForcedGear_AndZeroOnceItStops()
+    {
+        double v = Units.KmhToMps(30), r = P.Chassis.TyreCircumferenceM / (2 * Math.PI);
+        double k2 = P.Gearbox.ForwardRatios[1] * P.Gearbox.FinalDriveRatio / r, k3 = P.Gearbox.ForwardRatios[2] * P.Gearbox.FinalDriveRatio / r;
+        var sim = new Simulator(P, Road.Flat(), Gear.Second, v);
+        sim.Step(new DriverInput(0, 0, 0, Gear.Third));
+        Assert.InRange(sim.State.GrindSlipRadPerS, (k2 - k3) * v * 0.99, (k2 - k3) * v * 1.01);
+
+        sim.Step(new DriverInput(0, 0, 0, Gear.Neutral));
+        Assert.False(sim.State.Grinding);
+        Assert.Equal(0, sim.State.GrindSlipRadPerS);
+    }
+
     [Fact]
     public void Reverse_DrivesBackwards()
     {

@@ -10,7 +10,7 @@ namespace Sim.App;
 /// the newest physics frame from its own <see cref="LatestValue{T}"/> and never blocks the physics.
 /// Harmonics of the firing frequency carry the tone; lugging adds irregular per-firing amplitude
 /// modulation; boost adds filtered noise; the exhaust adds firing-pulsed noise under load; sliding tyres
-/// squeal; the starter adds a buzz.
+/// squeal; forcing a gear without the clutch grinds; the starter adds a buzz.
 /// </summary>
 public sealed unsafe class EngineSound : IDisposable
 {
@@ -36,6 +36,7 @@ public sealed unsafe class EngineSound : IDisposable
     private double _loudness, _turbo, _starter, _shudder, _load;
     private double _lugRandom, _noiseLowPass;
     private double _rasp, _raspLowPass, _squeal, _squealLow, _squealBand, _squealPhase, _squealWobble;
+    private double _grind, _grindPhase, _grindHz, _grindClash = 1, _grindHigh, _grindPrevNoise;
     private uint _rng = 0x9E3779B9;
     private double[] _harmonicScale = [];
     private double _testPhase, _testLevel, _lastTestHz;
@@ -135,6 +136,8 @@ public sealed unsafe class EngineSound : IDisposable
         double squealTarget = s.WheelSlip ? p.SquealGain * Math.Clamp(slipMps / p.SquealFullSlipMps, 0.3, 1) : 0;
         double squealAlpha = 1 - Math.Exp(-2 * Math.PI * p.SquealHz * 1.5 / SampleRate);
         double squealHighAlpha = 1 - Math.Exp(-2 * Math.PI * p.SquealHz * 0.6 / SampleRate);
+        double grindTarget = s.Grinding ? p.GrindGain : 0;
+        double grindHzTarget = Math.Clamp(s.GrindSlipRadPerS * p.GrindTeeth / (2 * Math.PI), p.GrindMinHz, p.GrindMaxHz);
 
         var harmonics = p.Harmonics;
         double gainSum = 0;
@@ -199,7 +202,26 @@ public sealed unsafe class EngineSound : IDisposable
                 squeal = _squeal * (0.6 * Math.Sin(2 * Math.PI * _squealPhase) + 0.8 * (_squealLow - _squealBand));
             }
 
-            double sample = p.MasterGain * (_loudness * tone * norm + _turbo * _noiseLowPass + _starter * starter + rasp) + squeal;
+            // Gear grinding: a buzzy tooth-rate wave, each tooth clashing a little differently, over bright noise.
+            // It starts at once (teeth hit) and stops quickly once the lever comes out.
+            _grind += (grindTarget - _grind) * (grindTarget > _grind ? 0.02 : smooth * 4);
+            double grind = 0;
+            if (_grind > 1e-5)
+            {
+                _grindHz += (grindHzTarget - _grindHz) * smooth;
+                double grindBefore = _grindPhase;
+                _grindPhase += _grindHz / SampleRate;
+                if (Math.Floor(_grindPhase) != Math.Floor(grindBefore)) _grindClash = 0.4 + 0.6 * NextUnit(); // next tooth
+                _grindPhase -= Math.Floor(_grindPhase);
+                double saw = 2 * _grindPhase - 1;
+                double noise = NextSigned();
+                _grindHigh = 0.7 * (_grindHigh + noise - _grindPrevNoise); // crude high-pass: the metallic hiss
+                _grindPrevNoise = noise;
+                double edge = Math.Exp(-6 * _grindPhase); // each clash is loudest as the tooth hits
+                grind = _grind * _grindClash * (0.6 * saw + 0.8 * edge - 0.13 + 0.6 * _grindHigh * (0.4 + edge));
+            }
+
+            double sample = p.MasterGain * (_loudness * tone * norm + _turbo * _noiseLowPass + _starter * starter + rasp) + squeal + grind;
             output[i] = (float)Math.Tanh(sample);
         }
         _rpm = rpmEnd;

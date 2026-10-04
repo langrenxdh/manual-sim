@@ -5,7 +5,9 @@
 // Harmonics below the speaker limit measured in first-time setup are turned down to belowSpeakerGain,
 // and lowCutCompensation of the removed gain is added to the next two harmonics above the limit.
 // exhaustRasp: noise pulsed by each firing, growing with load. squeal: tyre squeal while the driven tyres
-// slide, full from squealFullSlipMps of slip (M12). Each car in cars.json names its own sound file.
+// slide, full from squealFullSlipMps of slip (M12). grind: forcing a gear without the clutch (M13); the tooth
+// rate is the physics' slip speed x grindTeeth / 2 pi, kept within grindMinHz..grindMaxHz.
+// Each car in cars.json names its own sound file.
 {
   "masterGain": 0.7,
   "harmonics": [[1, 0.15], [2, 1.0], [3, 0.55], [4, 0.45], [5, 0.25], [6, 0.2], [7, 0.12], [8, 0.08]],
@@ -28,5 +30,9 @@
   "exhaustRaspCutoffHz": 2000,
   "squealGain": 0.25,
   "squealHz": 1100,
-  "squealFullSlipMps": 3
+  "squealFullSlipMps": 3,
+  "grindGain": 0.5,
+  "grindTeeth": 24,
+  "grindMinHz": 120,
+  "grindMaxHz": 1600
 }

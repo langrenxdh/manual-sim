@@ -44,6 +44,14 @@ public sealed record SoundParams
     public required double SquealGain { get; init; }
     public required double SquealHz { get; init; }
     public required double SquealFullSlipMps { get; init; }
+    /// <summary>
+    /// Gear grinding (M13): dog teeth clashing at the speed difference the physics reports. Tooth rate =
+    /// slip x <see cref="GrindTeeth"/> / 2 pi, kept within <see cref="GrindMinHz"/>..<see cref="GrindMaxHz"/>.
+    /// </summary>
+    public required double GrindGain { get; init; }
+    public required double GrindTeeth { get; init; }
+    public required double GrindMinHz { get; init; }
+    public required double GrindMaxHz { get; init; }
 
     public static SoundParams FromJson(string json)
     {
@@ -70,6 +78,8 @@ public sealed record SoundParams
         Require(LowCutCompensation >= 0, "lowCutCompensation must be >= 0");
         Require(ExhaustRaspGain >= 0 && ExhaustRaspCutoffHz > 0, "exhaust rasp gain must be >= 0 and cutoff > 0");
         Require(SquealGain >= 0 && SquealHz > 0 && SquealFullSlipMps > 0, "squeal gain must be >= 0, frequency and full slip > 0");
+        Require(GrindGain >= 0 && GrindTeeth > 0 && GrindMinHz > 0 && GrindMaxHz > GrindMinHz,
+            "grind: gain >= 0, teeth > 0, 0 < grindMinHz < grindMaxHz");
     }
 
     private static void Require(bool condition, string message)

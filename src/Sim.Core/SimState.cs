@@ -43,6 +43,8 @@ public readonly record struct SimState
     public Gear EngagedGear { get; init; }
     /// <summary>Lever is in a gear but the clutch is not pressed far enough: gears grind.</summary>
     public bool Grinding { get; init; }
+    /// <summary>While grinding: speed difference between the input shaft and the gear being forced in, rad/s (M13).</summary>
+    public double GrindSlipRadPerS { get; init; }
 
     // Vehicle
     public double SpeedMps { get; init; }

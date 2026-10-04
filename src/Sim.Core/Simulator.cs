@@ -34,6 +34,7 @@ public sealed class Simulator
     private bool _clutchLocked;
     private Gear _gear;
     private bool _grinding;
+    private double _grindSlip; // rad/s between the input shaft and the gear being forced in (M13)
     private double _driveForceN;
     private double _clutchTempC;  // M7: lumped clutch temperature
     private double _engineTempC;  // M7: lumped engine temperature
@@ -403,7 +404,10 @@ public sealed class Simulator
         {
             _gear = Gear.Neutral;
             _grinding = true;
+            // The dog teeth clash at the speed difference between the input shaft and that gear at road speed.
+            _grindSlip = Math.Abs(_wIn - InputShaftPerMetre(shifter) * _v);
         }
+        if (!_grinding) _grindSlip = 0;
     }
 
     private static double FiringsPerRev(VehicleParams p) => p.Engine.Cylinders / 2.0;
@@ -519,6 +523,7 @@ public sealed class Simulator
             ClutchSlipRpm = rpm - inputRpm,
             EngagedGear = _gear,
             Grinding = _grinding,
+            GrindSlipRadPerS = _grindSlip,
             SpeedMps = _v,
             PositionM = _x,
             AccelerationMps2 = acceleration,

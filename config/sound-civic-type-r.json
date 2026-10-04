@@ -22,5 +22,9 @@
   "exhaustRaspCutoffHz": 2600,
   "squealGain": 0.25,
   "squealHz": 1100,
-  "squealFullSlipMps": 3
+  "squealFullSlipMps": 3,
+  "grindGain": 0.5,
+  "grindTeeth": 24,
+  "grindMinHz": 120,
+  "grindMaxHz": 1600
 }
