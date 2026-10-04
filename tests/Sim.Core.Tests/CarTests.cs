@@ -6,7 +6,11 @@ namespace Sim.Core.Tests;
 /// </summary>
 public class CarTests
 {
-    public static TheoryData<string> Cars => ["golf-110tsi.json", "small-na-1.5.json", "diesel-2.0-turbo.json"];
+    public static TheoryData<string> Cars =>
+    [
+        "golf-110tsi.json", "small-na-1.5.json", "diesel-2.0-turbo.json",
+        "mustang-gt.json", "civic-type-r.json", "gr86.json", "mx5.json",
+    ];
 
     private static VehicleParams Load(string file) =>
         VehicleParams.FromJson(File.ReadAllText(Path.Combine(AppContext.BaseDirectory, "config", file)));

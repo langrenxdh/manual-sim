@@ -1,0 +1,115 @@
+// Ford Mustang GT 6MT (S550, Australian spec, 2018-2023), M12 (docs/design.en.md).
+// Published: 5.0 L Coyote V8, 339 kW @ 7000 rpm, 556 Nm @ 4600 rpm, redline 7500; Getrag MT82 6-speed,
+// 3.55 final drive; about 1750 kg, 53/47 front/rear; 275/40R19 rear tyres; rear-wheel drive.
+// Curves are gross combustion torque (net + friction), tuned by plausibility, not measured.
+{
+  "name": "Ford Mustang GT 5.0 V8 6MT",
+  "engine": {
+    "inertiaKgM2": 0.28,
+    "cylinders": 8,
+    "idleRpm": 700,
+    "stallRpm": 380,
+    "redlineRpm": 7500,
+    "fuelCutRpm": 7600,
+    "naTorqueNm": [[500, 272.0], [1000, 405.0], [1500, 457.5], [2000, 490.0], [3000, 537.0], [4000, 584.0], [4600, 604.8], [5000, 602.0], [6000, 582.0], [7000, 536.0], [7500, 500.0]],
+    "boostTorqueNm": [[1000, 0], [7500, 0]],
+    "boostTarget": [[1000, 0], [7500, 0]],
+    "boostTimeConstantS": 0.5,
+    "frictionTorqueNm": [[0, 110], [200, 22], [500, 22], [1000, 25], [2000, 30], [3000, 37], [4000, 44], [5000, 52], [6000, 62], [7000, 74], [7500, 80]],
+    "starterStallTorqueNm": 180,
+    "starterFreeRpm": 650
+  },
+  "idleControl": {
+    "proportionalGainNmPerRpm": 0.6,
+    "integralGainNmPerRpmS": 2,
+    "maxTorqueNm": 180
+  },
+  "clutch": {
+    "maxTorqueNm": 750,
+    "bitePoint": 0.8,
+    "biteZoneWidth": 0.7,
+    "engagementExponent": 2,
+    "shiftMaxEngagement": 0.05
+  },
+  "gearbox": {
+    "forwardRatios": [3.66, 2.43, 1.69, 1.32, 1.0, 0.65],
+    "reverseRatio": 3.07,
+    "finalDriveRatio": 3.55,
+    "efficiency": 0.9,
+    "inputShaftInertiaKgM2": 0.03,
+    "inputShaftDragNm": 1.5
+  },
+  "chassis": {
+    "massKg": 1750,
+    "tyreCircumferenceM": 2.207,
+    "rollingResistanceCoeff": 0.012,
+    "dragAreaM2": 0.79,
+    "maxBrakeForceN": 17200,
+    "handbrakeForceN": 5000
+  },
+  "environment": {
+    "gravityMps2": 9.81,
+    "airDensityKgM3": 1.2,
+    "ambientTempC": 25
+  },
+  "hillHold": {
+    "enabled": true,
+    "minGrade": 0.03,
+    "brakePedalThreshold": 0.1,
+    "standstillSpeedMps": 0.05,
+    "holdTimeS": 2.0,
+    "holdForceN": 5000,
+    "releaseRateNPerS": 15000,
+    "driveAwayForceRatio": 1.0
+  },
+  "shudder": {
+    "maxAmplitudeRatio": 0.3,
+    "fadeOutRpm": 1100,
+    "irregularity": 0.3,
+    "seed": 88043376
+  },
+  "clutchThermal": {
+    "heatCapacityJPerK": 3000,
+    "coolingWPerK": 15,
+    "fadeStartC": 250,
+    "fadeEndC": 350,
+    "minFrictionFactor": 0.6,
+    "smellAboveC": 220
+  },
+  "engineThermal": {
+    "heatCapacityJPerK": 50000,
+    "heatPerMechanicalW": 1.9,
+    "coolingWPerK": 20,
+    "warmC": 90,
+    "thermostatWPerK": 2000,
+    "coldReferenceC": 0,
+    "coldFrictionExtra": 0.5,
+    "coldIdleExtraRpm": 300
+  },
+  "airCon": {
+    "loadNm": 8,
+    "idleBumpRpm": 50
+  },
+  "steering": {
+    "wheelbaseM": 2.72,
+    "cgToFrontAxleM": 1.278,
+    "steeringRatio": 16,
+    "maxRoadWheelAngleDeg": 33,
+    "tyreGripMu": 1.0,
+    "mechanicalTrailM": 0.02,
+    "pneumaticTrailM": 0.03,
+    "pneumaticTrailFadeRatio": 0.3,
+    "powerAssistFactor": 0.22,
+    "centringLeverM": 0.012,
+    "centringFullSpeedMps": 1.5
+  },
+  "traction": {
+    "rearWheelDrive": true,
+    "cgHeightM": 0.52,
+    "peakMu": 1.2,
+    "slidingMu": 0.95,
+    "drivenWheelInertiaKgM2": 3.2,
+    "frontBrakeShare": 0.65,
+    "weightTransferTimeConstantS": 0.15
+  }
+}

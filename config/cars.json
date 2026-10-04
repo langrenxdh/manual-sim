@@ -1,4 +1,5 @@
 // Cars offered in the car menu (V). Each entry is a vehicle file in this folder (M7).
 {
-  "cars": ["golf-110tsi.json", "small-na-1.5.json", "diesel-2.0-turbo.json"]
+  "cars": ["golf-110tsi.json", "small-na-1.5.json", "diesel-2.0-turbo.json",
+           "mustang-gt.json", "civic-type-r.json", "gr86.json", "mx5.json"]
 }
