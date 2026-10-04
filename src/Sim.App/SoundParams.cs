@@ -27,8 +27,13 @@ public sealed record SoundParams
     public required double NotFiringGain { get; init; }
     /// <summary>Sound fades in linearly from 0 rpm up to this speed.</summary>
     public required double AudibleFromRpm { get; init; }
+    /// <summary>Turbo whoosh: noise in a band up to <see cref="TurboCutoffHz"/> (down to a third of it), growing with boost.</summary>
     public required double TurboGain { get; init; }
     public required double TurboCutoffHz { get; init; }
+    /// <summary>Turbo whistle: a faint tone rising from <see cref="TurboWhistleMinHz"/> to <see cref="TurboWhistleMaxHz"/> with boost, strongest at full boost.</summary>
+    public required double TurboWhistleGain { get; init; }
+    public required double TurboWhistleMinHz { get; init; }
+    public required double TurboWhistleMaxHz { get; init; }
     public required double StarterGain { get; init; }
     public required double StarterFrequencyHz { get; init; }
     /// <summary>Time constant for gain changes, so they do not click.</summary>
@@ -37,7 +42,7 @@ public sealed record SoundParams
     public required double BelowSpeakerGain { get; init; }
     /// <summary>Fraction of the removed gain added to the next two harmonics above the limit.</summary>
     public required double LowCutCompensation { get; init; }
-    /// <summary>Exhaust rasp: noise pulsed by each firing, growing with load (M12).</summary>
+    /// <summary>Exhaust rasp: noise pulsed by each firing, in proportion to load (silent with no load) (M12).</summary>
     public required double ExhaustRaspGain { get; init; }
     public required double ExhaustRaspCutoffHz { get; init; }
     /// <summary>Tyre squeal while the driven tyres slide (M12), at full strength from <see cref="SquealFullSlipMps"/> of slip.</summary>
@@ -72,6 +77,8 @@ public sealed record SoundParams
         Require(NotFiringGain >= 0, "notFiringGain must be >= 0");
         Require(AudibleFromRpm > 0, "audibleFromRpm must be > 0");
         Require(TurboGain >= 0 && TurboCutoffHz > 0, "turbo gain must be >= 0 and cutoff > 0");
+        Require(TurboWhistleGain >= 0 && TurboWhistleMinHz > 0 && TurboWhistleMaxHz >= TurboWhistleMinHz,
+            "turbo whistle: gain >= 0, 0 < turboWhistleMinHz <= turboWhistleMaxHz");
         Require(StarterGain >= 0 && StarterFrequencyHz > 0, "starter gain must be >= 0 and frequency > 0");
         Require(ParameterSmoothingS > 0, "parameterSmoothingS must be > 0");
         Require(BelowSpeakerGain is >= 0 and <= 1, "belowSpeakerGain must be in [0, 1]");

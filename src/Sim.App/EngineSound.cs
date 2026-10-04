@@ -34,7 +34,7 @@ public sealed unsafe class EngineSound : IDisposable
     // Synthesis state, touched only by the audio thread.
     private double _phase, _starterPhase, _rpm;
     private double _loudness, _turbo, _starter, _shudder, _load;
-    private double _lugRandom, _noiseLowPass;
+    private double _lugRandom, _noiseLowPass, _noiseLowerPass, _whistlePhase, _boost;
     private double _rasp, _raspLowPass, _squeal, _squealLow, _squealBand, _squealPhase, _squealWobble;
     private double _grind, _grindPhase, _grindHz, _grindClash = 1, _grindHigh, _grindPrevNoise;
     private uint _rng = 0x9E3779B9;
@@ -130,6 +130,8 @@ public sealed unsafe class EngineSound : IDisposable
         double shudderTarget = Math.Clamp(s.ShudderIntensity, 0, 1);
         double smooth = 1 - Math.Exp(-1 / (SampleRate * p.ParameterSmoothingS));
         double noiseAlpha = 1 - Math.Exp(-2 * Math.PI * p.TurboCutoffHz / SampleRate);
+        double noiseLowerAlpha = 1 - Math.Exp(-2 * Math.PI * p.TurboCutoffHz / 3 / SampleRate);
+        double boostTarget = Math.Clamp(s.Boost, 0, 1);
         double raspAlpha = 1 - Math.Exp(-2 * Math.PI * p.ExhaustRaspCutoffHz / SampleRate);
         double raspTarget = p.ExhaustRaspGain * (s.Firing ? 1 : 0) * audible;
         double slipMps = Math.Abs(s.DrivenWheelSpeedMps - s.SpeedMps);
@@ -161,6 +163,7 @@ public sealed unsafe class EngineSound : IDisposable
             _shudder += (shudderTarget - _shudder) * smooth;
             _load += (loadTarget - _load) * smooth;
             _rasp += (raspTarget - _rasp) * smooth;
+            _boost += (boostTarget - _boost) * smooth;
             _squeal += (squealTarget - _squeal) * smooth;
 
             // Lugging: each firing pulses the upper harmonics by a random amount.
@@ -178,7 +181,14 @@ public sealed unsafe class EngineSound : IDisposable
                 tone += gain * Math.Sin(2 * Math.PI * order * _phase);
             }
 
-            _noiseLowPass += (NextSigned() - _noiseLowPass) * noiseAlpha;
+            // Turbo: a band of noise (a whoosh, not a flat hiss) and a faint whistle that rises with boost.
+            double white = NextSigned();
+            _noiseLowPass += (white - _noiseLowPass) * noiseAlpha;
+            _noiseLowerPass += (white - _noiseLowerPass) * noiseLowerAlpha;
+            _whistlePhase += (p.TurboWhistleMinHz + (p.TurboWhistleMaxHz - p.TurboWhistleMinHz) * _boost) / SampleRate;
+            _whistlePhase -= Math.Floor(_whistlePhase);
+            double turbo = _turbo * (_noiseLowPass - _noiseLowerPass)
+                           + p.TurboWhistleGain * _boost * _boost * Math.Sin(2 * Math.PI * _whistlePhase);
 
             _starterPhase += p.StarterFrequencyHz / SampleRate;
             _starterPhase -= Math.Floor(_starterPhase);
@@ -187,7 +197,7 @@ public sealed unsafe class EngineSound : IDisposable
             // Exhaust: low-passed noise, pulsed by each firing and growing with load.
             _raspLowPass += (NextSigned() - _raspLowPass) * raspAlpha;
             double pulse = 0.5 + 0.5 * Math.Cos(2 * Math.PI * withinFiring);
-            double rasp = _rasp * (0.3 + 0.7 * _load) * pulse * pulse * _raspLowPass;
+            double rasp = _rasp * _load * pulse * pulse * _raspLowPass;
 
             // Tyre squeal: a wavering tone around squealHz inside band-passed noise.
             double squeal = 0;
@@ -221,7 +231,7 @@ public sealed unsafe class EngineSound : IDisposable
                 grind = _grind * _grindClash * (0.6 * saw + 0.8 * edge - 0.13 + 0.6 * _grindHigh * (0.4 + edge));
             }
 
-            double sample = p.MasterGain * (_loudness * tone * norm + _turbo * _noiseLowPass + _starter * starter + rasp) + squeal + grind;
+            double sample = p.MasterGain * (_loudness * tone * norm + turbo + _starter * starter + rasp) + squeal + grind;
             output[i] = (float)Math.Tanh(sample);
         }
         _rpm = rpmEnd;

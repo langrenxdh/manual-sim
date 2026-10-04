@@ -4,35 +4,39 @@
 // what PC speakers play, so energy sits in orders 2-8 and the ear fills in the missing fundamental.
 // Harmonics below the speaker limit measured in first-time setup are turned down to belowSpeakerGain,
 // and lowCutCompensation of the removed gain is added to the next two harmonics above the limit.
-// exhaustRasp: noise pulsed by each firing, growing with load. squeal: tyre squeal while the driven tyres
+// turbo: a band of noise (turboCutoffHz down to a third of it) plus a faint whistle rising with boost.
+// exhaustRasp: noise pulsed by each firing, in proportion to load (silent with no load). squeal: tyre squeal while the driven tyres
 // slide, full from squealFullSlipMps of slip (M12). grind: forcing a gear without the clutch (M13); the tooth
 // rate is the physics' slip speed x grindTeeth / 2 pi, kept within grindMinHz..grindMaxHz.
 // Each car in cars.json names its own sound file.
 {
-  "masterGain": 0.7,
+  "masterGain": 0.19,
   "harmonics": [[1, 0.15], [2, 1.0], [3, 0.55], [4, 0.45], [5, 0.25], [6, 0.2], [7, 0.12], [8, 0.08]],
   "loadReferenceNm": 250,
   "idleLoudness": 0.45,
   "loadLoudness": 0.55,
-  "loadBrightness": 0.8,
+  "loadBrightness": 0.01,
   "lugModulationDepth": 0.7,
   "lugMinOrder": 3,
   "notFiringGain": 0.25,
   "audibleFromRpm": 150,
-  "turboGain": 0.12,
+  "turboGain": 0.05,
   "turboCutoffHz": 1800,
-  "starterGain": 0.25,
+  "turboWhistleGain": 0.02,
+  "turboWhistleMinHz": 3000,
+  "turboWhistleMaxHz": 5500,
+  "starterGain": 0,
   "starterFrequencyHz": 140,
   "parameterSmoothingS": 0.02,
   "belowSpeakerGain": 0.2,
   "lowCutCompensation": 0.6,
-  "exhaustRaspGain": 0.06,
+  "exhaustRaspGain": 0.04,
   "exhaustRaspCutoffHz": 2000,
   "squealGain": 0.25,
   "squealHz": 1100,
   "squealFullSlipMps": 3,
-  "grindGain": 0.5,
-  "grindTeeth": 24,
+  "grindGain": 0,
+  "grindTeeth": 23.9976,
   "grindMinHz": 120,
   "grindMaxHz": 1600
 }
