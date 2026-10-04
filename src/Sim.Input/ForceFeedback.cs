@@ -6,7 +6,7 @@ namespace Sim.Input;
 
 /// <summary>
 /// G29 wheel motor through SDL3 haptics: a continuously updated sine (engine judder), a second sine
-/// switched on and off (gear grinding), short constant-force pulses (jolts), an optional
+/// switched on and off (gear grinding), short fading sine bursts (jolts: driveline shunt), an optional
 /// centering spring and a continuously updated constant force for steering (M9). Create, use and dispose it on one thread (the force-feedback thread); it opens
 /// the haptic device by name, independently of the joystick the physics thread polls.
 /// </summary>
@@ -33,7 +33,7 @@ public sealed unsafe class ForceFeedback : IDisposable
         _shudder = SDL_CreateHapticEffect(haptic, &sine);
         var grind = Sine(80, 0, SDL_HAPTIC_INFINITY);
         _grind = SDL_CreateHapticEffect(haptic, &grind);
-        var jolt = Constant(0, 100);
+        var jolt = Sine(8, 0, 100);
         _jolt = SDL_CreateHapticEffect(haptic, &jolt);
         var steer = Constant(0, SDL_HAPTIC_INFINITY);
         _steer = SDL_CreateHapticEffect(haptic, &steer);
@@ -94,10 +94,16 @@ public sealed unsafe class ForceFeedback : IDisposable
         SetSine(_grind, ref _grindRunning, frequencyHz, magnitude);
     }
 
-    /// <summary>One short constant-force pulse. Level -1..1 (sign = direction on the wheel).</summary>
-    public void Jolt(double level, uint lengthMs)
+    /// <summary>
+    /// One jolt: a sine burst that fades from <paramref name="magnitude"/> (0..1) to nothing over
+    /// <paramref name="lengthMs"/>, pushing neither way on average, so it shakes the wheel without
+    /// steering it. A new jolt restarts the burst.
+    /// </summary>
+    public void Jolt(double magnitude, double frequencyHz, uint lengthMs)
     {
-        var e = Constant(level, lengthMs);
+        var e = Sine(frequencyHz, magnitude, lengthMs);
+        e.periodic.fade_length = (ushort)Math.Min(lengthMs, ushort.MaxValue);
+        e.periodic.fade_level = 0;
         long t = Stopwatch.GetTimestamp();
         Done(t, SDL_UpdateHapticEffect(_haptic, _jolt, &e) && SDL_RunHapticEffect(_haptic, _jolt, 1));
     }

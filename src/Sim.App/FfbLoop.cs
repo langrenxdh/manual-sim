@@ -14,6 +14,11 @@ public readonly record struct FfbStatus(bool Connected, string? Device, string? 
 /// </summary>
 public sealed class FfbLoop : IDisposable
 {
+    /// <summary>A jolt fires once the jerk has fallen this far below its peak ...</summary>
+    private const double PeakFallRatio = 0.8;
+    /// <summary>... or this long after it crossed the threshold, whichever comes first.</summary>
+    private const double PeakWaitS = 0.03;
+
     private readonly LatestValue<Frame> _source;
     private readonly Thread _thread;
     private volatile bool _stop;
@@ -46,7 +51,7 @@ public sealed class FfbLoop : IDisposable
         string? error = null;
         var clock = Stopwatch.StartNew();
         double lastS = 0, sinceRetryS = double.MaxValue, rateWindowS = 0, lastJoltS = double.MinValue;
-        double filteredAccel = 0, previousFiltered = 0, rateHz = 0;
+        double filteredAccel = 0, previousFiltered = 0, rateHz = 0, peakJerk = 0, peakStartS = 0;
         double previousWheelDeg = 0, wheelRateDegPerS = 0;
         long ticks = 0, jolts = 0;
         bool primed = false;
@@ -99,21 +104,33 @@ public sealed class FfbLoop : IDisposable
                     double firingHz = Math.Max(0, s.EngineRpm) / 60 * 2;
                     wheel.SetShudder(firingHz, s.Firing ? s.ShudderIntensity * p.ShudderMagnitude : 0);
                     wheel.SetGrind(p.GrindFrequencyHz, s.Grinding ? p.GrindMagnitude : 0);
-                    // Steering (town map): aligning torque plus damping, in the sim's sign convention
+                    // Steering (town map): aligning torque, damping and friction, in the sim's sign convention
                     // (positive = towards a left turn), then onto the raw axis direction.
                     double? steer = null;
                     if (s.Steering)
                     {
                         double level = s.AligningTorqueNm / p.SteeringFullScaleNm * p.SteeringGain
-                                       - p.SteeringDamperPerDegPerS * wheelRateDegPerS;
+                                       - p.SteeringDamperPerDegPerS * wheelRateDegPerS
+                                       - p.SteeringFrictionLevel * Math.Tanh(wheelRateDegPerS / p.SteeringFrictionRateDegPerS);
                         steer = Math.Clamp(level, -1, 1) * (SteeringAxisInverted ? -1 : 1);
                     }
                     wheel.SetSteeringForce(steer);
-                    if (Math.Abs(jerk) > p.JoltThresholdMps3 && (now - lastJoltS) * 1000 >= p.JoltCooldownMs)
+                    // Rough clutch engagement, a stall or a hard stop: a fading shake that grows with the
+                    // jerk, so it follows the speed mismatch and how fast the clutch came up. It fires at the
+                    // jerk's peak (once it falls back, or after PeakWaitS), not where it crosses the threshold.
+                    double absJerk = Math.Abs(jerk);
+                    bool ready = (now - lastJoltS) * 1000 >= p.JoltCooldownMs;
+                    if (ready && absJerk > p.JoltThresholdMps3)
                     {
-                        double level = Math.Min(1, Math.Abs(jerk) / p.JoltFullScaleMps3) * p.JoltMagnitude;
-                        wheel.Jolt(Math.Sign(jerk) * level, (uint)p.JoltLengthMs);
+                        if (peakJerk == 0) peakStartS = now;
+                        peakJerk = Math.Max(peakJerk, absJerk);
+                    }
+                    if (peakJerk > 0 && (absJerk < peakJerk * PeakFallRatio || now - peakStartS >= PeakWaitS))
+                    {
+                        double level = Math.Clamp((peakJerk - p.JoltThresholdMps3) / (p.JoltFullScaleMps3 - p.JoltThresholdMps3), 0, 1);
+                        wheel.Jolt(level * p.JoltMagnitude, p.JoltFrequencyHz, (uint)p.JoltLengthMs);
                         lastJoltS = now;
+                        peakJerk = 0;
                         jolts++;
                     }
                 }

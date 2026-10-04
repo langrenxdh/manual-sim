@@ -17,9 +17,12 @@ public sealed record FfbParams
     public required double AccelerationFilterHz { get; init; }
     /// <summary>Jerk below this gives no jolt.</summary>
     public required double JoltThresholdMps3 { get; init; }
-    /// <summary>Jerk at which the jolt reaches <see cref="JoltMagnitude"/>.</summary>
+    /// <summary>Jerk at which the jolt reaches <see cref="JoltMagnitude"/>; the jolt grows linearly from the threshold.</summary>
     public required double JoltFullScaleMps3 { get; init; }
     public required double JoltMagnitude { get; init; }
+    /// <summary>Frequency of the jolt's fading shake (driveline shunt).</summary>
+    public required double JoltFrequencyHz { get; init; }
+    /// <summary>Time the jolt's shake takes to fade out.</summary>
     public required double JoltLengthMs { get; init; }
     /// <summary>Minimum time between two jolts.</summary>
     public required double JoltCooldownMs { get; init; }
@@ -34,6 +37,10 @@ public sealed record FfbParams
     public required double SteeringDamperPerDegPerS { get; init; }
     /// <summary>Low-pass on the wheel's rate of turn before damping it.</summary>
     public required double SteeringRateFilterHz { get; init; }
+    /// <summary>Force fraction of steering friction (rack and column), opposing the wheel's turning.</summary>
+    public required double SteeringFrictionLevel { get; init; }
+    /// <summary>Rate of turn at which the friction is about fully built up (smooths it round zero).</summary>
+    public required double SteeringFrictionRateDegPerS { get; init; }
 
     public static FfbParams FromJson(string json)
     {
@@ -48,10 +55,12 @@ public sealed record FfbParams
         Require(UpdateRateHz is >= 10 and <= 1000, "updateRateHz must be in [10, 1000]");
         Require(new[] { MasterGain, ShudderMagnitude, GrindMagnitude, JoltMagnitude, CenteringSpring }.All(v => v is >= 0 and <= 1),
             "gains and magnitudes must be in [0, 1]");
-        Require(GrindFrequencyHz > 0 && AccelerationFilterHz > 0, "frequencies must be > 0");
+        Require(GrindFrequencyHz > 0 && AccelerationFilterHz > 0 && JoltFrequencyHz > 0, "frequencies must be > 0");
         Require(JoltThresholdMps3 >= 0 && JoltFullScaleMps3 > JoltThresholdMps3, "joltFullScaleMps3 must be above joltThresholdMps3");
         Require(SteeringFullScaleNm > 0 && SteeringGain is >= 0 and <= 2 && SteeringDamperPerDegPerS >= 0 && SteeringRateFilterHz > 0,
             "steering: fullScaleNm > 0, gain in [0, 2], damper >= 0, filter > 0");
+        Require(SteeringFrictionLevel is >= 0 and <= 1 && SteeringFrictionRateDegPerS > 0,
+            "steering friction: level in [0, 1], rate > 0");
         Require(JoltLengthMs > 0 && JoltCooldownMs >= 0 && ReconnectIntervalS > 0, "times must be positive");
     }
 

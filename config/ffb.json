@@ -1,8 +1,11 @@
 // Wheel force feedback (docs/design.md 反馈通道 / 力反馈; design.en.md Feedback channels / Force feedback).
 // Presentation only, updated at ~100 Hz on its own thread. Magnitudes are fractions of full motor force.
-// Jolts come from longitudinal jerk (rate of change of filtered acceleration), so stalls, clutch dumps
-// and hard braking all produce one without a special "stall" rule. On the town map (steering on, M9) the
-// wheel is also pushed by the physics aligning torque (steeringFullScaleNm = full motor force) plus a damper.
+// Jolts come from longitudinal jerk (rate of change of filtered acceleration), so rough clutch engagement
+// (revs not matched, clutch let up fast or dropped), stalls and hard braking all produce one without a
+// special rule. A jolt is a fading shake (joltFrequencyHz, fading over joltLengthMs) that grows linearly
+// from joltThresholdMps3 to joltFullScaleMps3; it never pushes the wheel one way. On the town map (steering
+// on, M9) the wheel is also pushed by the physics aligning torque (steeringFullScaleNm = full motor force),
+// a damper and a little friction.
 {
   "deviceNameContains": "G29",
   "updateRateHz": 100,
@@ -11,15 +14,18 @@
   "grindFrequencyHz": 80,
   "grindMagnitude": 0.5,
   "accelerationFilterHz": 15,
-  "joltThresholdMps3": 25,
-  "joltFullScaleMps3": 150,
+  "joltThresholdMps3": 30,
+  "joltFullScaleMps3": 400,
   "joltMagnitude": 0.8,
-  "joltLengthMs": 120,
+  "joltFrequencyHz": 8,
+  "joltLengthMs": 350,
   "joltCooldownMs": 250,
   "centeringSpring": 0,
   "reconnectIntervalS": 1.0,
-  "steeringFullScaleNm": 3.0,
+  "steeringFullScaleNm": 2.0,
   "steeringGain": 1.0,
   "steeringDamperPerDegPerS": 0.0003,
-  "steeringRateFilterHz": 10
+  "steeringRateFilterHz": 10,
+  "steeringFrictionLevel": 0.04,
+  "steeringFrictionRateDegPerS": 20
 }
