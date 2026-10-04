@@ -23,7 +23,10 @@ A manual transmission practice simulator: clutch, throttle and gear changes in a
 | E | Exercises, exams and progress |
 | R / H | Restart (H: on the hill) or retry the exercise |
 | M | Hill road / town map (steering) |
-| V | Choose the car |
+| V | Choose the car (Golf, small petrol, diesel, Mustang GT, Civic Type R, GR86, MX-5) |
+| K | Leaderboard: every driver's best scores |
+| F | Mirrors on / off |
+| B | Overhead view (town map) |
 | T | Teaching mode (clutch curve, cues) |
 | P | Replay |
 | C | Air-con |
@@ -34,6 +37,8 @@ A manual transmission practice simulator: clutch, throttle and gear changes in a
 | Esc | Leave the exercise, or quit |
 
 Start the engine with X on the wheel. Reverse is the H-shifter's 7th position.
+
+At every start the app asks who is driving: pick your name with the D-pad (or arrows) and press Enter, or choose "+ New driver" and type a name. Each driver's scores are kept separately; "Change driver" in the exercise menu switches.
 
 ## Building the package (for developers)
 

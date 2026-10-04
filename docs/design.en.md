@@ -246,6 +246,9 @@ There is no real-car data, so the "ground truth" is my driving experience with t
 | T15 | 3rd at 50 km/h with the wheel at 20°, 45° and 200° left, and 45° right (M9) | Aligning torque opposes the turn, larger at 45° than at 20°, smaller when sliding (200°) than at 45° | The wheel pulls back to centre and goes light at the grip limit |
 | T16 | Steering off (the hill road), wheel turned 300° (M9) | The car follows the road: world X = road position, heading 0 | Steering never changes v1 behaviour |
 | T17 | Steering on, 1st at 7 km/h, wheel held at ±180° (M9 follow-up) | Aligning torque towards centre ≥ 0.3 Nm, equal and opposite left and right; 0 at a standstill | The wheel returns at parking and roundabout speeds; standing still it stays put |
+| T18 | Golf: T1-style pull-away, a brisk part-throttle run through 2nd, a firm stop (M12) | The tyres never slip; driven-wheel speed = road speed throughout | Ordinary driving stays within grip |
+| T19 | Mustang GT in 1st, clutch dropped from 4000 rpm at full throttle, throttle lifted at 2 s (M12) | The rears spin; while sliding the acceleration matches slidingMu × rear load (with weight transfer) − rolling − aero within 2 %; they grip again after the lift | Wheelspin at the sliding limit |
+| T20 | Mustang at 60 km/h, 4th → 1st with the clutch let out in 0.15 s; Type R in 1st dropped from 5000 rpm (M12) | The Mustang's rears lock (slower than the road) and then grip; the Type R's fronts spin | Engine-braking lock-up, and front-wheel drive spins its fronts |
 
 Every time I remember another "my car does this", add a row.
 
@@ -263,7 +266,7 @@ The first step is M0: one day to confirm that G29 input and force feedback both 
 
 M2 uses 2D instruments instead of a 3D scene so the feet can get on the pedals and start tuning as early as possible; visuals come once the feel is right. No stage has a date.
 
-The milestones after M4 (M5–M10: coaching, more exercises, fidelity and other cars, steering, sharing) and their order are in [`roadmap.en.md`](roadmap.en.md). When a milestone starts, its detailed design is written into this document.
+The milestones after M4 (M5–M13: coaching, more exercises, fidelity and other cars, steering, sharing, driver profiles, traction and performance cars, grind sound) and their order are in [`roadmap.en.md`](roadmap.en.md). When a milestone starts, its detailed design is written into this document.
 
 ## Open questions
 
@@ -466,3 +469,35 @@ The milestones after M4 (M5–M10: coaching, more exercises, fidelity and other 
 | P3 | In Chinese the font is DengXian (`Deng.ttf`, falling back to SimHei), loaded with ASCII plus exactly the characters used in the table. Spoken cues use a Chinese voice when Windows has one | A full CJK atlas would be huge; the table defines what can appear |
 | P4 | L switches the language and saves it in `config/ui.json`; `--language zh|en` overrides it for one run | The choice survives restarts |
 | P5 | Not done: the input wizard (needs hard rule 5 lifted), and the gate "a friend installs it and drives without help", which needs a friend | Waiting for my decision and a test |
+
+## M11 decision record (driver profiles)
+
+2026-10-04, implemented; hand check pending.
+
+| # | Decision | Reason |
+| --- | --- | --- |
+| Q1 | Drivers are listed in `scores/drivers.json`. The first driver ever created owns `scores/` itself; later drivers get `scores/drivers/<id>/` (id from the name). Each folder holds that driver's `scores.jsonl`, ghosts and exam results | Scores recorded before profiles become the first driver's without moving or rewriting a file: they are the owner's real data |
+| Q2 | "Who is driving?" opens at every start (Enter keeps the last driver) and from the exercise menu ("Change driver"). D-pad or arrows pick, D-pad right or Enter drives; "+ New driver" takes a typed name (letters, digits, space, `-_.'`). Until a driver exists it cannot be closed | Choosing works with the wheel alone; typing a new name needs the keyboard once |
+| Q3 | Leaderboard (K, or the menu): one row per exercise and exam, one column per driver (up to 6), each driver's best, the top score in green and the current driver's name in orange. The result card adds "Record: 92 by Alex" when another driver holds the record. Telemetry recordings stay shared | Comparing and competing is the point; raw recordings are not scores |
+| Q4 | Not done: racing another driver's ghost, per-driver settings (teaching mode, car), renaming or removing drivers | Kept small until it has been used |
+
+## M12 decision record (traction, cylinders, performance cars, per-car sound)
+
+2026-10-04, implemented; hand check pending.
+
+| # | Decision | Reason |
+| --- | --- | --- |
+| R1 | `engine.cylinders` in every car file sets firings per turn (cylinders / 2) for the firing pulsation, the sound and the judder in the wheel; `SimState.FiringsPerRev` carries it | A V8 fires four times a turn; the 4-cylinder value was hard-coded in three places |
+| R2 | Longitudinal traction: the driven tyres grip until the force they must pass exceeds `peakMu` × their axle load, then slide at `slidingMu` × load (Coulomb, no slip curve) until the slip speed returns to zero, when wheels and body share momentum. While sliding, the input shaft and driven wheels (`drivenWheelInertiaKgM2`) move apart from the body. Locking under engine braking emerges the same way. Within grip every step is computed exactly as before, so T1–T17 are unchanged | Without it a Mustang would launch at about 1.1 g; hard rule 2: wheelspin and lock-up come from the model, not from rules |
+| R3 | Axle load = static share (from `cgToFrontAxleM`) plus the load moved rearwards by acceleration and uphill slope through `cgHeightM`, with acceleration low-passed by `weightTransferTimeConstantS` (body pitch). Brakes: `frontBrakeShare` of the foot brake on the front axle; the handbrake on the rear. Brake force on the driven axle acts on those wheels (so they cannot spin against held brakes); the rest acts on the body (ABS idealised) | A rear-driven car gains grip when it launches, a front-driven one loses it; a held brake must hold the wheels |
+| R4 | Four cars from published figures, tuned by plausibility: Ford Mustang GT 6MT (5.0 V8, 8 cylinders, RWD, 1750 kg), Honda Civic Type R FK8 (2.0 turbo, FWD, 1380 kg), Toyota GR86 (2.4 NA flat-four, RWD, 1270 kg), Mazda MX-5 ND 2.0 (RWD, 1060 kg). Performance tyres: peakMu 1.1–1.2. The Golf keeps road tyres (1.0 / 0.8). All pass T11 | Clearly different cars to drive; a skilled-launch probe gives 0–100 km/h of about 6.2 s (Mustang), 6.4 s (Type R, MX-5), 7.2 s (GR86), 9.1 s (Golf) |
+| R5 | `cars.json` entries name a vehicle file and a sound file; choosing a car swaps both, and the panel's Sound tab follows. Sound files per car: fractional harmonic orders give the V8's half-order burble and the boxer's rumble; new firing-pulsed exhaust noise (`exhaustRaspGain`, `exhaustRaspCutoffHz`) grows with load; a tyre squeal (`squealGain`, `squealHz`, `squealFullSlipMps`) plays while the driven tyres slide | Each car should sound like itself; wheelspin needs to be heard |
+| R6 | Not done: combined slip (power oversteer: the lateral model stays kinematic), traction control / ASR, per-car force feedback | Out of scope for this round |
+
+## M13 decision record (gear-grind sound)
+
+2026-10-04, implemented; hand check pending.
+
+| # | Decision | Reason |
+| --- | --- | --- |
+| U1 | The physics reports `GrindSlipRadPerS`: the speed difference between the input shaft and the gear being forced in at road speed. The sound turns it into a tooth-clash rate (slip × `grindTeeth` / 2π, within `grindMinHz`–`grindMaxHz`): a buzzy wave with a sharp clash per tooth, each tooth a little different, over a metallic hiss. It starts at once and stops quickly; `grindGain` per car | Grinding was only felt; the pitch now tells how far the speeds are apart, from the physics flag with no special rule |

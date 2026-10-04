@@ -27,9 +27,9 @@ v1 (M0–M3) is complete, and M4 (graded exercises and scoring) is built. This d
 | 13 | Cold engine (higher, less stable idle) and air-con load at idle | Fidelity |
 | 14 | Other cars: more vehicle configs and a car menu | Fidelity |
 | 15 | Sharing: installer, setup for other wheels and pedals, Chinese/English UI | Sharing |
-| 16 | Driver profiles: scores, ghosts and history kept per driver, compared on a leaderboard | Backlog (to discuss) |
-| 17 | Performance cars (for example a Mustang, a Honda Type R) with their own specs and engine/exhaust sound | Backlog (to discuss) |
-| 18 | Gear-grind sound, alongside the grind felt in the wheel | Backlog (to discuss) |
+| 16 | Driver profiles: scores, ghosts and history kept per driver, compared on a leaderboard | Coaching |
+| 17 | Performance cars (for example a Mustang, a Honda Type R) with their own specs and engine/exhaust sound | Fidelity |
+| 18 | Gear-grind sound, alongside the grind felt in the wheel | Fidelity |
 
 ## Order and reasoning
 
@@ -111,13 +111,28 @@ Split into steps, each with its own gate:
 - Chinese/English UI: string tables, font with CJK glyphs.
 - **Gate:** a friend installs it on their own PC and wheel and drives without help.
 
-## Backlog — to discuss before planning
+### M11 — Driver profiles (idea 16)
 
-Added 2026-10-04. Not scheduled yet: each is discussed first, then gets a milestone with a gate like the others.
+**Status: implemented (2026-10-04), see the M11 decision record in the design doc; hand check pending.**
 
-- **Driver profiles (16):** pick or create a driver at start (and from the menu). Each driver has their own `scores/<driver>/` (history, ghosts, exam results), so several people can share one PC. A leaderboard compares drivers per exercise and exam (best, recent average), and the replay could show another driver's ghost to race against. To discuss: how a driver is chosen with the wheel only (D-pad list), whether today's scores become the first profile (they must be kept: they are the owner's real data), and whether settings such as teaching mode are per driver.
-- **Performance cars (17):** more vehicle files beside the Golf, the diesel and the small petrol, for example a Ford Mustang GT (5.0 V8, rear-wheel drive, 6-speed manual) and a Honda Civic Type R (2.0 turbo, high revs, 6-speed). Each with its own engine curves, inertia, redline, gear ratios, clutch, mass, tyres and steering, from published figures and tuned by plausibility. Each also gets its own sound profile (firing order and cylinder count, exhaust note, induction and turbo or not), so `engine-sound.json` becomes per car. To discuss: rear-wheel drive and wheelspin need a longitudinal tyre slip model the physics does not have yet (today the tyres never slip lengthwise); whether a car may also change the force feedback (heavier steering, stronger judder); which cars first.
-- **Gear-grind sound (18):** today grinding is only felt (80 Hz buzz in the wheel). Add a synthesised grinding sound in the audio callback while `Grinding` is set: a harsh, noisy, metallic rasp whose pitch follows the speed difference between the gear being forced in and the input shaft, in the engine sound's mix with its own gain in the panel. It follows the physics flag, no special rule.
+- A driver picker at every start and from the menu; each driver's scores, ghosts and exams in their own folder; the existing scores become the first driver's, untouched.
+- A leaderboard (K) of every driver's best per exercise and exam; the result card names another driver's record.
+- **Gate:** two people share the PC, each sees their own history, and the leaderboard compares them fairly.
+
+### M12 — Traction and performance cars (idea 17)
+
+**Status: implemented (2026-10-04), see the M12 decision record in the design doc; hand check pending.**
+
+- Cylinder count per car; longitudinal traction (driven tyres grip or slide, weight transfer, front- or rear-wheel drive, brakes on the driven wheels), T18–T20.
+- Mustang GT, Civic Type R, GR86 and MX-5 from published figures; each car with its own engine sound, exhaust rasp and tyre squeal.
+- **Gate:** each new car feels and sounds clearly different; a hard launch spins the driven wheels and careful throttle avoids it; the Golf still feels like the Golf.
+
+### M13 — Gear-grind sound (idea 18)
+
+**Status: implemented (2026-10-04), see the M13 decision record in the design doc; hand check pending.**
+
+- A grinding sound whose pitch follows the speed difference the physics reports, alongside the buzz in the wheel.
+- **Gate:** forcing a gear without the clutch sounds like a real grind, harsher the bigger the speed difference.
 
 ## Notes for every milestone
 
