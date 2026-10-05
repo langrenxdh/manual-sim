@@ -6,7 +6,7 @@
 
 v1 (M0–M3) is complete, and M4 (graded exercises and scoring) is built. This document collects every idea for what comes next (all of them accepted), and fixes the implementation order and the gate for each milestone.
 
-**How this relates to the design doc.** This is the plan; [`design.en.md`](design.en.md) remains the specification. When a milestone starts, its detailed design (parameters, tests, decisions) is written into the design doc in the same way as M0–M4, and this roadmap only links to it. The working rules do not change: one milestone at a time, plan mode first, stop at the gate.
+**How this relates to the design doc.** This is the plan; [`design.en.md`](design.en.md) remains the specification. When a milestone starts, its detailed design (parameters, tests, decisions) is written into the design doc in the same way as M0–M4, and this roadmap only links to it. The working rules do not change: one milestone at a time, stop at the gate.
 
 ## All ideas
 
@@ -39,7 +39,7 @@ v1 (M0–M3) is complete, and M4 (graded exercises and scoring) is built. This d
 4. **Fidelity (M7)** after the exercises, because clutch temperature and cold engines change how the exercises feel and score. Better to calibrate the scores once, on the more realistic model. Other cars come here because the car menu builds on the same per-car tuning.
 5. **Exam mode and audio cues (M8)** need the full set of no-steering exercises to draw from.
 6. **Steering (M9) last among the big items, not first.** It is the largest change: a new input, a lateral physics model, a new road network and a different force-feedback design. Everything before it delivers value quickly and none of it is wasted when steering arrives. It starts with a short hardware check, like M0.
-7. **Sharing (M10)** only makes sense once the product is complete, and it requires lifting docs/engineering-rules.en.md hard rule 5 ("hardware is fixed"). That is your decision to make at that point; until then rule 5 stands.
+7. **Sharing (M10)** only makes sense once the product is complete, and it requires lifting hard rule 5 in [`engineering-rules.en.md`](engineering-rules.en.md) ("hardware is fixed"). That is your decision to make at that point; until then rule 5 stands.
 
 ## Milestones
 
@@ -96,7 +96,7 @@ v1 (M0–M3) is complete, and M4 (graded exercises and scoring) is built. This d
 Split into steps, each with its own gate:
 
 - **M9a hardware check (like M0):** read the wheel angle at 1 kHz (axis 0 already reads, 12k levels over the range); verify a constant-force effect can be updated at 100+ Hz to produce a smooth, variable centring torque without stutter, together with the judder sine. `HwProbe` gets a steering-torque test. Gate: smooth variable torque on the G29.
-- **M9b lateral physics (Sim.Core; can run in the cloud):** a single-track ("bicycle") model with a simple tyre model (linear up to the grip limit, then saturating), yaw rate, lateral acceleration, the steering ratio and the self-aligning torque. New inputs: steering angle. New acceptance tests (for example: steady circle radius matches the steering angle at low speed; grip limit reached at a plausible lateral g). The longitudinal model and T1–T5 are unchanged.
+- **M9b lateral physics (Sim.Core):** a single-track ("bicycle") model with a simple tyre model (linear up to the grip limit, then saturating), yaw rate, lateral acceleration, the steering ratio and the self-aligning torque. New inputs: steering angle. New acceptance tests (for example: steady circle radius matches the steering angle at low speed; grip limit reached at a plausible lateral g). The longitudinal model and T1–T5 are unchanged.
 - **M9c roads:** the straight road becomes a road network: bends, a T intersection, a roundabout, a car park. A centre-line path with curvature; the 3D view, camera yaw and the physics share it. Leaving the road is detected (no crash physics in v2).
 - **M9d steering force feedback:** the wheel torque comes from the model's self-aligning torque plus a centring spring, with engine judder layered on top; replaces the "spring off" default. Tuned by feel.
 - **M9e steering exercises:** roundabout (slow down, 2nd gear, give way, pull away while turning), car-park bay, three-point turn; scored like the others plus line keeping.
@@ -136,6 +136,5 @@ Split into steps, each with its own gate:
 
 ## Notes for every milestone
 
-- Bilingual docs and docs/engineering-rules.en.md rules apply throughout: tests are never weakened, every tunable goes in a config file and the panel, physics never waits.
-- Pure logic (Core, Training) can be done in cloud sessions; anything touching the G29, the screen or sound must be local (docs/engineering-rules.en.md).
+- Bilingual docs and the [engineering rules](engineering-rules.en.md) apply throughout: tests are never weakened, every tunable goes in a config file and the panel, physics never waits.
 - Each milestone ends with a hand check on the G29 and stops at its gate.

@@ -9,7 +9,7 @@ namespace Sim.App;
 
 /// <summary>
 /// Live tuning panel (Tab). Shows every value of every <see cref="TunableDocument"/> as a tree,
-/// built from the JSON itself so new parameters appear without code changes (docs/engineering-rules.en.md hard rule 3).
+/// built from the JSON itself so new parameters appear without code changes (docs/engineering-rules.en.md, hard rule 3).
 /// Keys: Up/Down select, Left/Right change (Shift x10, Ctrl x0.1), Enter expand/toggle, Ctrl+S save.
 /// </summary>
 public sealed class TuningPanel

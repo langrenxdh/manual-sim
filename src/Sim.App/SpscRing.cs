@@ -3,7 +3,7 @@ namespace Sim.App;
 /// <summary>
 /// Lock-free bounded queue for exactly one producer thread and one consumer thread. Unlike
 /// <see cref="LatestValue{T}"/> it keeps every item (telemetry needs every physics step). When full,
-/// the producer drops the item and counts it instead of waiting (docs/engineering-rules.en.md hard rule 6).
+/// the producer drops the item and counts it instead of waiting (docs/engineering-rules.en.md, hard rule 6).
 /// </summary>
 public sealed class SpscRing<T> where T : struct
 {

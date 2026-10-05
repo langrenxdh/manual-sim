@@ -204,7 +204,7 @@ The stack is .NET 10 + raylib-cs + SDL3. Two selection criteria: the hard parts 
 | Graphics and sound | raylib-cs | No editor or scene files, everything is code; the audio stream API supports real-time synthesis |
 | Input and force feedback | SDL3 (input and haptic subsystems only) | raylib cannot do wheel force feedback; SDL3 uses DirectInput on Windows |
 
-Not chosen: Unity / Godot editors and scene files are hard for an AI to work with, and their built-in physics would have to be bypassed; the Web Gamepad API can hardly do wheel force feedback.
+Not chosen: Unity / Godot editors and scene files are hard to diff, review and test automatically, and their built-in physics would have to be bypassed; the Web Gamepad API can hardly do wheel force feedback.
 
 ```mermaid
 flowchart TD
@@ -283,7 +283,7 @@ The milestones after M4 (M5–M13: coaching, more exercises, fidelity and other 
 
 ## M1 decision record
 
-2026-10-03, M1 completed in the cloud; all decisions below confirmed ("all suggestions accepted").
+2026-10-03, M1 completed; all decisions below confirmed.
 
 | # | Decision | Reason |
 | --- | --- | --- |

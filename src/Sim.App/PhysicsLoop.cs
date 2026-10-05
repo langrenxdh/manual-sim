@@ -32,7 +32,7 @@ public readonly record struct Frame(
 /// <summary>
 /// The 1 kHz physics thread. It owns the wheel reader and the simulator, steps on wall-clock time
 /// and publishes each step to every consumer's <see cref="LatestValue{T}"/>. It never waits for
-/// rendering or audio (docs/engineering-rules.en.md hard rule 6). Changes from the UI arrive through atomic
+/// rendering or audio (docs/engineering-rules.en.md, hard rule 6). Changes from the UI arrive through atomic
 /// references and are applied between steps.
 /// </summary>
 public sealed class PhysicsLoop : IDisposable
