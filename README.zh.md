@@ -2,6 +2,8 @@
 
 **为罗技 G29 打造的"玻璃盒"手动挡训练模拟器。** 离合打滑、传递扭矩、ECU 怠速补偿、离熄火还有多远，全部有模型、实时显示、事后回放，所以熄火时你能看到*为什么*。
 
+[![CI](https://github.com/langrenxdh/manual-sim/actions/workflows/ci.yml/badge.svg)](https://github.com/langrenxdh/manual-sim/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 [English](README.md)
 
 ![带教学浮层的坡起：离合曲线、熄火余量、怠速控制和坡起辅助](docs/media/teaching.png)
@@ -108,6 +110,10 @@ dotnet test
 | [HwProbe](tools/HwProbe/README.md) | 硬件探测工具用法 |
 
 每份文档都有英文（`.en.md`）和中文（`.md`）两个版本。
+
+## 声明
+
+Manual Sim 是独立的业余项目，与大众、福特、本田、丰田、马自达或罗技没有关联，也未获其认可。车型和产品名称归其所有者所有，仅用于说明所模拟的对象。车辆参数是为了手感而取的近似值，不是厂商数据。
 
 ## 许可证
 

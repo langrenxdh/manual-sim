@@ -2,6 +2,10 @@
 
 **A glass-box manual transmission trainer for the Logitech G29.** Clutch slip, transmitted torque, ECU idle compensation and distance-to-stall are all modelled, shown live, and replayed afterwards, so when you stall you can see *why*.
 
+[![CI](https://github.com/langrenxdh/manual-sim/actions/workflows/ci.yml/badge.svg)](https://github.com/langrenxdh/manual-sim/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
+[![CI](https://github.com/langrenxdh/manual-sim/actions/workflows/ci.yml/badge.svg)](https://github.com/langrenxdh/manual-sim/actions/workflows/ci.yml) [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 [中文](README.zh.md)
 
 ![Hill start with the teaching overlay: clutch curve, stall margin, idle control and hill hold](docs/media/teaching.png)
@@ -108,6 +112,10 @@ Twenty acceptance tests (T1–T20) pin the car's behaviour: pull-away, stalling,
 | [HwProbe](tools/HwProbe/README.en.md) | Hardware probe usage |
 
 Every document exists in English (`.en.md`) and Chinese (`.md`).
+
+## Disclaimer
+
+Manual Sim is an independent hobby project. It is not affiliated with or endorsed by Volkswagen, Ford, Honda, Toyota, Mazda or Logitech. Car and product names are trademarks of their owners and are used only to describe what is simulated. The car parameters are approximations chosen to feel right, not manufacturer data.
 
 ## License
 
