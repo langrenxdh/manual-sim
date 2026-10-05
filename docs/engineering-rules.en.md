@@ -47,5 +47,6 @@ config/               vehicle parameter files (e.g. golf-110tsi.json)
 - Code, identifiers and comments are in English.
 - Human-facing docs are bilingual: Chinese `X.md` plus English `X.en.md`, each linking to the other.
   Every doc change goes into both files in the same commit.
+  The one exception is the front page: `README.md` is English and `README.zh.md` is Chinese.
 - Small commits, one concern each.
 - Anything that needs the physical G29 (hardware checks, feel tuning) is verified by hand on the wheel.
