@@ -47,7 +47,7 @@ Other wheels are not supported yet. The physics and training libraries are platf
 
 ## Run it
 
-**From a package.** Unzip `ManualSim.zip`, run `ManualSim.exe` and follow the first-time setup (screen size, viewing distance, speaker check). See [docs/install.en.md](docs/install.en.md).
+**From a package.** Download `ManualSim.zip` from the [latest release](https://github.com/langrenxdh/manual-sim/releases/latest), unzip it, run `ManualSim.exe` and follow the first-time setup (screen size, viewing distance, speaker check). See [docs/install.en.md](docs/install.en.md).
 
 **From source.** Needs the .NET 10 SDK.
 

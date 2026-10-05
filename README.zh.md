@@ -45,7 +45,7 @@ Manual Sim 围绕一辆车展开，2019 款大众 Golf 110TSI（1.4 L 涡轮，6
 
 ## 运行
 
-**用发布包。** 解压 `ManualSim.zip`，运行 `ManualSim.exe`，按首次设置操作（屏幕尺寸、观看距离、喇叭检查）。见 [docs/install.md](docs/install.md)。
+**用发布包。** 从[最新发布](https://github.com/langrenxdh/manual-sim/releases/latest)下载 `ManualSim.zip` 并解压，运行 `ManualSim.exe`，按首次设置操作（屏幕尺寸、观看距离、喇叭检查）。见 [docs/install.md](docs/install.md)。
 
 **从源码。** 需要 .NET 10 SDK。
 
