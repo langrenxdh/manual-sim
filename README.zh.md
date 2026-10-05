@@ -108,3 +108,7 @@ dotnet test
 | [HwProbe](tools/HwProbe/README.md) | 硬件探测工具用法 |
 
 每份文档都有英文（`.en.md`）和中文（`.md`）两个版本。
+
+## 许可证
+
+[MIT](LICENSE)

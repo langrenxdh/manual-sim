@@ -108,3 +108,7 @@ Twenty acceptance tests (T1–T20) pin the car's behaviour: pull-away, stalling,
 | [HwProbe](tools/HwProbe/README.en.md) | Hardware probe usage |
 
 Every document exists in English (`.en.md`) and Chinese (`.md`).
+
+## License
+
+[MIT](LICENSE)
